@@ -194,5 +194,10 @@ def monitoring_status():
         'history': analysis_history[-5:] if analysis_history else []  # Últimas 5 análises
     })
 
+# Handler para Vercel
+def handler(request):
+    with app.request_context(request.environ):
+        return app.full_dispatch_request()
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -40,8 +40,17 @@
       "dest": "/api/similaridade"
     },
     {
+      "src": "/api/monitoring/(.*)",
+      "dest": "/api/app"
+    },
+    {
       "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "dest": "/api/app"
     }
-  ]
+  ],
+  "functions": {
+    "api/*.py": {
+      "runtime": "python3.9"
+    }
+  }
 }

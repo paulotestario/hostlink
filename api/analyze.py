@@ -33,5 +33,6 @@ def analyze():
         }), 500
 
 # Handler para Vercel
-def handler(request, response):
-    return app(request.environ, response)
+def handler(request):
+    with app.request_context(request.environ):
+        return app.full_dispatch_request()

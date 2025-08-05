@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Arquivos de desenvolvimento
+web_app.py
+monitor_automatico.py
+consulta_personalizada.py
+exemplo_uso.py
+*.zip
+
+# Documentação de desenvolvimento
+README.md
+README_WEB.md
+CORRECOES_*.md
+FUNCIONALIDADES_*.md

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HostLink - Agenda de Preços</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='hostlink-theme.css') }}" rel="stylesheet">
+    <style>
+        .calendar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .calendar-day {
+            min-height: 120px;
+            border: 1px solid #dee2e6;
+            padding: 8px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .calendar-day:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .day-number {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+        .price-tag {
+            background: linear-gradient(135deg, #FF5A5F, #FF8E8E);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: inline-block;
+        }
+        .weather-icon {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 1.2em;
+        }
+        .sun-icon {
+            color: #FFD700;
+        }
+        .rain-icon {
+            color: #4A90E2;
+        }
+        .cloud-icon {
+            color: #87CEEB;
+        }
+        .weekend {
+            background-color: #fff3cd;
+        }
+        .today {
+            background-color: #d1ecf1;
+            border: 2px solid #bee5eb;
+        }
+        .month-header {
+            background: linear-gradient(135deg, #FF5A5F, #FF8E8E);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .weekday-header {
+            background-color: #f8f9fa;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            border: 1px solid #dee2e6;
+        }
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .discount-badge {
+            background-color: #28a745;
+            color: white;
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 8px;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header HostLink -->
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-handshake me-2" style="color: #00A699;"></i>
+                HOSTLINK
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-home me-2"></i>Início
+                </a>
+                <a class="nav-link active" href="/agenda">
+                    <i class="fas fa-calendar-alt me-2"></i>Agenda de Preços
+                </a>
+                <a class="nav-link" href="/analise">
+                    <i class="fas fa-chart-line me-2"></i>Análise Detalhada
+                </a>
+                <a class="nav-link" href="/similaridade">
+                    <i class="fas fa-search me-2"></i>Análise de Similaridade
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid section-spacing">
+        <div class="calendar-container">
+            <!-- Header -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="month-header">
+                        <h2><i class="fas fa-calendar-alt me-2"></i>Agenda de Preços - Itacuruçá</h2>
+                        <p class="mb-0">Preços sugeridos e previsão do tempo para os próximos dias</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controles -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary" onclick="previousMonth()">
+                            <i class="fas fa-chevron-left"></i> Anterior
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="nextMonth()">
+                            Próximo <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="button" class="btn btn-success" onclick="generatePrices()">
+                        <i class="fas fa-sync-alt me-2"></i>Atualizar Preços
+                    </button>
+                    <a href="/" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-home me-2"></i>Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div class="loading-spinner" id="loadingSpinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2">Gerando preços e previsões...</p>
+            </div>
+
+            <!-- Calendário -->
+            <div class="row" id="calendarContainer">
+                <!-- Cabeçalho dos dias da semana -->
+                <div class="col-12">
+                    <div class="row">
+                        <div class="col weekday-header">Domingo</div>
+                        <div class="col weekday-header">Segunda</div>
+                        <div class="col weekday-header">Terça</div>
+                        <div class="col weekday-header">Quarta</div>
+                        <div class="col weekday-header">Quinta</div>
+                        <div class="col weekday-header">Sexta</div>
+                        <div class="col weekday-header">Sábado</div>
+                    </div>
+                </div>
+                
+                <!-- Dias do calendário serão inseridos aqui via JavaScript -->
+                <div class="col-12" id="calendarDays">
+                    <!-- Conteúdo gerado dinamicamente -->
+                </div>
+            </div>
+
+            <!-- Legenda -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Legenda</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <i class="fas fa-sun sun-icon me-2"></i>Sol (0-30% chuva)
+                                </div>
+                                <div class="col-md-3">
+                                    <i class="fas fa-cloud-sun cloud-icon me-2"></i>Parcialmente nublado (31-60% chuva)
+                                </div>
+                                <div class="col-md-3">
+                                    <i class="fas fa-cloud-rain rain-icon me-2"></i>Chuva (61%+ chuva)
+                                </div>
+                                <div class="col-md-3">
+                                    <span class="weekend" style="padding: 4px 8px; border-radius: 4px;">Fins de semana</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentDate = new Date();
+        let currentMonth = currentDate.getMonth();
+        let currentYear = currentDate.getFullYear();
+        
+        const monthNames = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+
+        function generateCalendar(month, year) {
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+            
+            // Atualizar título do mês
+            document.querySelector('.month-header h2').innerHTML = 
+                `<i class="fas fa-calendar-alt me-2"></i>Agenda de Preços - ${monthNames[month]} ${year}`;
+            
+            let calendarHTML = '';
+            let dayCount = 1;
+            
+            // Gerar semanas
+            for (let week = 0; week < 6; week++) {
+                calendarHTML += '<div class="row">';
+                
+                // Gerar dias da semana
+                for (let day = 0; day < 7; day++) {
+                    if (week === 0 && day < firstDay) {
+                        // Dias vazios antes do primeiro dia do mês
+                        calendarHTML += '<div class="col calendar-day"></div>';
+                    } else if (dayCount > daysInMonth) {
+                        // Dias vazios após o último dia do mês
+                        calendarHTML += '<div class="col calendar-day"></div>';
+                    } else {
+                        const currentDateObj = new Date(year, month, dayCount);
+                        const isToday = currentDateObj.toDateString() === today.toDateString();
+                        const isWeekend = day === 0 || day === 6; // Domingo ou Sábado
+                        
+                        let dayClass = 'col calendar-day';
+                        if (isToday) dayClass += ' today';
+                        if (isWeekend) dayClass += ' weekend';
+                        
+                        calendarHTML += `
+                            <div class="${dayClass}" data-date="${year}-${String(month + 1).padStart(2, '0')}-${String(dayCount).padStart(2, '0')}">
+                                <div class="day-number">${dayCount}</div>
+                                <div class="price-container" id="price-${year}-${month}-${dayCount}">
+                                    <div class="price-tag">R$ ---</div>
+                                </div>
+                                <div class="weather-icon" id="weather-${year}-${month}-${dayCount}">
+                                    <i class="fas fa-question-circle text-muted"></i>
+                                </div>
+                            </div>
+                        `;
+                        dayCount++;
+                    }
+                }
+                
+                calendarHTML += '</div>';
+                
+                // Parar se já passou do último dia do mês
+                if (dayCount > daysInMonth) break;
+            }
+            
+            document.getElementById('calendarDays').innerHTML = calendarHTML;
+        }
+
+        function previousMonth() {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            generateCalendar(currentMonth, currentYear);
+            generatePrices();
+        }
+
+        function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            generateCalendar(currentMonth, currentYear);
+            generatePrices();
+        }
+
+        async function generatePrices() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+            
+            try {
+                // Chamar API para obter dados reais
+                const response = await fetch(`/api/get_calendar_data?month=${currentMonth + 1}&year=${currentYear}`);
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    // Atualizar interface com dados reais
+                    result.data.forEach(dayData => {
+                        const { day, price, discount, weather_icon, weather_class, rain_probability } = dayData;
+                        
+                        // Atualizar preço na interface
+                        const priceContainer = document.getElementById(`price-${currentYear}-${currentMonth}-${day}`);
+                        if (priceContainer) {
+                            priceContainer.innerHTML = `
+                                <div class="price-tag">R$ ${price}</div>
+                                <div class="discount-badge">${discount.toFixed(0)}% off</div>
+                            `;
+                        }
+                        
+                        // Atualizar clima na interface
+                        const weatherContainer = document.getElementById(`weather-${currentYear}-${currentMonth}-${day}`);
+                        if (weatherContainer) {
+                            weatherContainer.innerHTML = `<i class="${weather_icon} ${weather_class}" title="${rain_probability.toFixed(0)}% chance de chuva"></i>`;
+                        }
+                    });
+                } else {
+                    console.error('Erro na resposta da API:', result.error);
+                    // Fallback para dados simulados
+                    await generateFallbackPrices();
+                }
+                
+            } catch (error) {
+                console.error('Erro ao buscar dados da API:', error);
+                // Fallback para dados simulados
+                await generateFallbackPrices();
+            }
+            
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+        
+        async function generateFallbackPrices() {
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                // Gerar dados simulados como fallback
+                const basePrice = 200;
+                const dayOfWeek = new Date(currentYear, currentMonth, day).getDay();
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                
+                let price = basePrice;
+                if (isWeekend) price += 50;
+                price += (day % 10) * 10;
+                
+                const rainChance = (day * 7) % 100;
+                let weatherIcon, weatherClass;
+                
+                if (rainChance <= 30) {
+                    weatherIcon = 'fas fa-sun';
+                    weatherClass = 'sun-icon';
+                } else if (rainChance <= 60) {
+                    weatherIcon = 'fas fa-cloud-sun';
+                    weatherClass = 'cloud-icon';
+                } else {
+                    weatherIcon = 'fas fa-cloud-rain';
+                    weatherClass = 'rain-icon';
+                }
+                
+                const discountPercent = 5 + (day % 8);
+                
+                // Atualizar preço na interface
+                const priceContainer = document.getElementById(`price-${currentYear}-${currentMonth}-${day}`);
+                if (priceContainer) {
+                    priceContainer.innerHTML = `
+                        <div class="price-tag">R$ ${price}</div>
+                        <div class="discount-badge">${discountPercent}% off</div>
+                    `;
+                }
+                
+                // Atualizar clima na interface
+                const weatherContainer = document.getElementById(`weather-${currentYear}-${currentMonth}-${day}`);
+                if (weatherContainer) {
+                    weatherContainer.innerHTML = `<i class="${weatherIcon} ${weatherClass}" title="${rainChance}% chance de chuva"></i>`;
+                }
+            }
+        }
+
+        // Inicializar calendário
+        document.addEventListener('DOMContentLoaded', function() {
+            generateCalendar(currentMonth, currentYear);
+            generatePrices();
+        });
+    </script>
+</body>
+</html>

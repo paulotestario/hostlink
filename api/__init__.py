@@ -1,0 +1,1 @@
+# Pacote API para funções serverless do Vercel

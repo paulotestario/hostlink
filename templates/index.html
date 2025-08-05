@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HostLink - Análise de Preços Airbnb</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='hostlink-theme.css') }}" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .card-hover {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .price-highlight {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .weather-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-active { background-color: #28a745; }
+        .status-inactive { background-color: #dc3545; }
+        .loading {
+            display: none;
+        }
+        .analysis-card {
+            border-left: 4px solid #007bff;
+        }
+        .weekend-option {
+            background-color: #e3f2fd !important;
+            font-weight: bold !important;
+            color: #1976d2 !important;
+        }
+        .weekday-option {
+            background-color: #f5f5f5 !important;
+            color: #666 !important;
+        }
+        #periodSelect {
+            font-size: 0.95rem;
+        }
+        .period-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            margin-left: 5px;
+        }
+        .weekend-badge {
+            background-color: #007bff;
+            color: white;
+        }
+        .weekday-badge {
+            background-color: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header HostLink -->
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-handshake me-2" style="color: #00A699;"></i>
+                HOSTLINK
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/agenda">
+                    <i class="fas fa-calendar-alt me-2"></i>Agenda de Preços
+                </a>
+                <a class="nav-link" href="/analise">
+                    <i class="fas fa-chart-line me-2"></i>Análise Detalhada
+                </a>
+                <a class="nav-link" href="/similaridade">
+                    <i class="fas fa-search me-2"></i>Análise de Similaridade
+                </a>
+                <span class="nav-link">
+                    <span class="status-indicator {{ 'status-active' if monitoring_active else 'status-inactive' }}"></span>
+                    Monitoramento {{ 'Ativo' if monitoring_active else 'Inativo' }}
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section HostLink -->
+    <div class="hero-section" style="background-image: url('https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=1926&q=80');">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <h1 class="display-4 fw-bold mb-4">Maximize seus Ganhos no Airbnb</h1>
+            <p class="lead mb-4">Análise inteligente de preços com dados climáticos e competitivos para otimizar sua receita como host.</p>
+            <button class="btn btn-cta" onclick="document.getElementById('analysisForm').scrollIntoView({behavior: 'smooth'})">
+                <i class="fas fa-rocket me-2"></i>Quero ser HostLink
+            </button>
+        </div>
+    </div>
+
+    <div class="container section-spacing">
+        <!-- Controles Principais -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card card-hover">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-search me-2"></i>Nova Análise</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="analysisForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">Período para Análise</label>
+                                    <div class="input-group">
+                                        <select class="form-control" id="periodSelect" name="period">
+                                            <option value="">Carregando períodos...</option>
+                                        </select>
+                                        <button type="button" class="btn btn-outline-primary" onclick="openCalendarModal()" title="Selecionar datas na agenda">
+                                            <i class="fas fa-calendar-alt"></i>
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Próximos finais de semana e dias úteis ou <strong>clique no calendário</strong> para selecionar datas</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Check-in</label>
+                                    <input type="date" class="form-control" id="checkin" name="checkin" readonly>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Check-out</label>
+                                    <input type="date" class="form-control" id="checkout" name="checkout" readonly>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-12">
+                                    <label class="form-label">Link do Anúncio <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="url" class="form-control" id="listing_url" name="listing_url" placeholder="https://www.airbnb.com.br/rooms/123456789" required>
+                                        <button type="button" class="btn btn-outline-danger" id="clearUrlBtn" onclick="clearSavedUrl()" title="Remover link salvo">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Cole o link de um anúncio específico do Airbnb para análise direcionada. <span id="urlStatus" class="text-success"></span></small>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Adultos</label>
+                                    <select class="form-control" id="adults" name="adults">
+                                        <option value="1">1 Adulto</option>
+                                        <option value="2" selected>2 Adultos</option>
+                                        <option value="3">3 Adultos</option>
+                                        <option value="4">4 Adultos</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="beachfront" name="beachfront" checked>
+                                        <label class="form-check-label" for="beachfront">
+                                            Propriedade à beira-mar
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-12 text-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-chart-line me-2"></i>Executar Análise
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                        <div class="loading mt-3">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Carregando...</span>
+                                </div>
+                                <p class="mt-2">Analisando preços e clima...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card card-hover">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-robot me-2"></i>Monitoramento</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <p class="mb-3">Análises automáticas 2x ao dia</p>
+                        {% if monitoring_active %}
+                            <button class="btn btn-danger" onclick="stopMonitoring()">
+                                <i class="fas fa-stop me-2"></i>Parar Monitoramento
+                            </button>
+                        {% else %}
+                            <button class="btn btn-success" onclick="startMonitoring()">
+                                <i class="fas fa-play me-2"></i>Iniciar Monitoramento
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resultados da Última Análise -->
+        {% if latest_analysis %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card analysis-card">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Última Análise
+                            <small class="text-muted ms-2">{{ latest_analysis.timestamp[:19].replace('T', ' ') }}</small>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- Preços -->
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <h6 class="text-muted">Preço Sugerido</h6>
+                                    <div class="price-highlight">R$ {{ "%.2f"|format(latest_analysis.pricing_suggestion.suggested_price) if latest_analysis and latest_analysis.pricing_suggestion else "0.00" }}</div>
+                                    <small class="text-muted">por noite</small>
+                                </div>
+                            </div>
+                            <!-- Clima -->
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <div class="weather-icon">
+                                        {% set rain_prob = latest_analysis.weather_data[0].rain_probability if latest_analysis and latest_analysis.weather_data and latest_analysis.weather_data|length > 0 else 0 %}
+                                        {% if rain_prob <= 30 %}
+                                            <i class="fas fa-sun text-warning"></i>
+                                        {% elif rain_prob <= 60 %}
+                                            <i class="fas fa-cloud-sun text-info"></i>
+                                        {% else %}
+                                            <i class="fas fa-cloud-rain text-primary"></i>
+                                        {% endif %}
+                                    </div>
+                                    <h6>{{ latest_analysis.weather_data[0].rain_probability if latest_analysis and latest_analysis.weather_data and latest_analysis.weather_data|length > 0 else 0 }}% de chuva</h6>
+                                </div>
+                            </div>
+                            <!-- Competitividade -->
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <h6 class="text-muted">Desconto Aplicado</h6>
+                                    <div class="h4 text-info">{{ "%.1f%%"|format(latest_analysis.pricing_suggestion.discount_percentage) if latest_analysis and latest_analysis.pricing_suggestion and latest_analysis.pricing_suggestion.discount_percentage else "5.0%" }}</div>
+                                    <small class="text-muted">{{ latest_analysis.pricing_suggestion.strategy if latest_analysis and latest_analysis.pricing_suggestion else "Estratégia padrão" }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Detalhes Adicionais -->
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <h6>Período da Análise</h6>
+                                <p class="mb-1"><strong>Check-in:</strong> {{ latest_analysis.checkin }}</p>
+                                <p class="mb-1"><strong>Check-out:</strong> {{ latest_analysis.checkout }}</p>
+                                <p class="mb-1"><strong>Adultos:</strong> {{ latest_analysis.adults }}</p>
+                                {% if latest_analysis and latest_analysis.competitive_data and latest_analysis.competitive_data[0] and latest_analysis.competitive_data[0].daily_rate_display %}
+                                <p class="mb-0"><strong>💰 Valor da Diária:</strong> <span class="text-success">{{ latest_analysis.competitive_data[0].daily_rate_display }}</span></p>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Análise Competitiva</h6>
+                                {% if latest_analysis and latest_analysis.competitive_data %}
+                                    <p class="mb-1"><strong>Concorrentes analisados:</strong> {{ latest_analysis.competitive_data|length }}</p>
+                                    {% if latest_analysis.pricing_suggestion.market_analysis and latest_analysis.pricing_suggestion.market_analysis.favorite_listings > 0 %}
+                                        <p class="mb-1"><strong>📌 Favoritos incluídos:</strong> <span class="text-primary">{{ latest_analysis.pricing_suggestion.market_analysis.favorite_listings }}</span></p>
+                                        <p class="mb-1"><strong>💰 Preço médio favoritos:</strong> R$ {{ "%.2f"|format(latest_analysis.pricing_suggestion.market_analysis.avg_price_favorites) }}</p>
+                                    {% endif %}
+                                    <p class="mb-1"><strong>Preço médio concorrência:</strong> R$ {{ "%.2f"|format(latest_analysis.pricing_suggestion.reference_avg) if latest_analysis and latest_analysis.pricing_suggestion and latest_analysis.pricing_suggestion.reference_avg else "0.00" }}</p>
+                                    <p class="mb-1"><strong>Desconto aplicado:</strong> {{ "%.1f%%"|format(latest_analysis.pricing_suggestion.discount_percentage) if latest_analysis and latest_analysis.pricing_suggestion and latest_analysis.pricing_suggestion.discount_percentage else "5.0%" }}</p>
+                                    {% if latest_analysis.pricing_suggestion.market_min and latest_analysis.pricing_suggestion.market_max %}
+                                        <p class="mb-0"><strong>Faixa de preços:</strong> R$ {{ "%.2f"|format(latest_analysis.pricing_suggestion.market_min) }} - R$ {{ "%.2f"|format(latest_analysis.pricing_suggestion.market_max) }}</p>
+                                    {% endif %}
+                                {% else %}
+                                    <p class="text-muted">Dados de concorrência não disponíveis</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Justificativa do Desconto -->
+                        {% if latest_analysis and latest_analysis.pricing_suggestion and latest_analysis.pricing_suggestion.discount_justification %}
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h6>Justificativa do Desconto</h6>
+                                <div class="alert alert-info mb-0">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    {{ latest_analysis.pricing_suggestion.discount_justification }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mt-3">
+                            <a href="/analise" class="btn btn-outline-primary">
+                                <i class="fas fa-eye me-2"></i>Ver Análise Detalhada
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Alertas e Mensagens -->
+        <div id="alerts"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Carregar períodos disponíveis
+        let availablePeriods = [];
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAvailablePeriods();
+        });
+        
+        function loadAvailablePeriods() {
+            fetch('/api/get_periods')
+            .then(response => response.json())
+            .then(result => {
+                console.log('Resposta da API get_periods:', result);
+                if (result.success) {
+                    availablePeriods = result.data;
+                    console.log('Períodos carregados:', availablePeriods);
+                    populatePeriodSelect();
+                } else {
+                    console.error('Erro ao carregar períodos:', result.error);
+                    showAlert('Erro ao carregar períodos: ' + result.error, 'warning');
+                }
+            })
+            .catch(error => {
+                console.error('Erro de conexão:', error);
+                showAlert('Erro de conexão ao carregar períodos: ' + error.message, 'danger');
+            });
+        }
+        
+        function populatePeriodSelect() {
+             const select = document.getElementById('periodSelect');
+             select.innerHTML = '<option value="">Selecione um período...</option>';
+             
+             // Verificar se availablePeriods é um array válido
+             if (!Array.isArray(availablePeriods) || availablePeriods.length === 0) {
+                 console.warn('availablePeriods não é um array válido ou está vazio');
+                 return;
+             }
+             
+             // Separar finais de semana e dias de semana
+             const weekends = availablePeriods.filter(p => p && p.type === 'weekend');
+             const weekdays = availablePeriods.filter(p => p && p.type === 'weekday');
+             
+             // Adicionar finais de semana primeiro (destacados)
+             if (weekends.length > 0) {
+                 const weekendGroup = document.createElement('optgroup');
+                 weekendGroup.label = '🌟 FINAIS DE SEMANA (Recomendado)';
+                 
+                 weekends.forEach((period, index) => {
+                     const option = document.createElement('option');
+                     const originalIndex = availablePeriods.indexOf(period);
+                     option.value = originalIndex;
+                     option.innerHTML = `${period.label}`;
+                     option.className = 'weekend-option';
+                     weekendGroup.appendChild(option);
+                     
+                     // Selecionar o primeiro final de semana por padrão
+                     if (index === 0) {
+                         option.selected = true;
+                         updateDatesFromPeriod(period);
+                     }
+                 });
+                 
+                 select.appendChild(weekendGroup);
+             }
+             
+             // Adicionar dias de semana
+             if (weekdays.length > 0) {
+                 const weekdayGroup = document.createElement('optgroup');
+                 weekdayGroup.label = '📅 Dias de Semana';
+                 
+                 weekdays.forEach((period) => {
+                     const option = document.createElement('option');
+                     const originalIndex = availablePeriods.indexOf(period);
+                     option.value = originalIndex;
+                     option.innerHTML = `${period.label}`;
+                     option.className = 'weekday-option';
+                     weekdayGroup.appendChild(option);
+                 });
+                 
+                 select.appendChild(weekdayGroup);
+             }
+         }
+        
+        function updateDatesFromPeriod(period) {
+            document.getElementById('checkin').value = period.checkin;
+            document.getElementById('checkout').value = period.checkout;
+        }
+        
+        // Atualizar datas quando período for selecionado
+        document.getElementById('periodSelect').addEventListener('change', function() {
+            const selectedIndex = this.value;
+            if (selectedIndex !== '' && availablePeriods[selectedIndex]) {
+                updateDatesFromPeriod(availablePeriods[selectedIndex]);
+            }
+        });
+
+        // Executar análise
+        document.getElementById('analysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const selectedPeriodIndex = document.getElementById('periodSelect').value;
+            const listingUrl = formData.get('listing_url');
+            
+            if (selectedPeriodIndex === '') {
+                showAlert('Por favor, selecione um período para análise.', 'warning');
+                return;
+            }
+            
+            if (!listingUrl || listingUrl.trim() === '') {
+                showAlert('Por favor, informe o link do anúncio do Airbnb.', 'warning');
+                return;
+            }
+            
+            if (!listingUrl.includes('airbnb.com')) {
+                showAlert('Por favor, informe um link válido do Airbnb.', 'warning');
+                return;
+            }
+            
+            // Verificar se availablePeriods está carregado
+            if (!Array.isArray(availablePeriods) || availablePeriods.length === 0) {
+                console.error('availablePeriods não está carregado:', availablePeriods);
+                showAlert('Períodos não carregados. Tente recarregar a página.', 'danger');
+                return;
+            }
+            
+            // Converter para número e validar
+            const periodIndex = parseInt(selectedPeriodIndex);
+            if (isNaN(periodIndex) || periodIndex < 0 || periodIndex >= availablePeriods.length) {
+                console.error('Índice inválido:', selectedPeriodIndex, 'availablePeriods.length:', availablePeriods.length);
+                showAlert('Índice de período inválido. Tente recarregar a página.', 'danger');
+                return;
+            }
+            
+            const selectedPeriod = availablePeriods[periodIndex];
+            
+            console.log('Índice selecionado:', selectedPeriodIndex, 'convertido para:', periodIndex);
+            console.log('Período selecionado:', selectedPeriod);
+            console.log('availablePeriods atual:', availablePeriods);
+            
+            // Verificar se selectedPeriod é válido
+            if (!selectedPeriod || !selectedPeriod.type) {
+                console.error('Período inválido - selectedPeriod:', selectedPeriod);
+                showAlert('Período selecionado inválido. Tente recarregar a página.', 'danger');
+                return;
+            }
+            
+            const data = {
+                checkin: formData.get('checkin'),
+                checkout: formData.get('checkout'),
+                adults: parseInt(formData.get('adults')),
+                beachfront: formData.get('beachfront') === 'on',
+                period_type: selectedPeriod.type,
+                listing_url: formData.get('listing_url') || ''
+            };
+            
+            showLoading(true);
+            showAlert('Executando análise...', 'info');
+            
+            fetch('/api/run_analysis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                showLoading(false);
+                if (result.success) {
+                    showAlert('Análise executada com sucesso!', 'success');
+                    // Recarregar a página após 2 segundos para mostrar os resultados
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    showAlert('Erro: ' + result.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showLoading(false);
+                showAlert('Erro de conexão: ' + error.message, 'danger');
+            });
+        });
+
+        // Iniciar monitoramento
+        function startMonitoring() {
+            showAlert('Iniciando monitoramento automático...', 'info');
+            
+            fetch('/api/start_monitoring', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ beachfront: true })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    showAlert('Monitoramento iniciado com sucesso!', 'success');
+                    // Atualizar status imediatamente
+                    const statusIndicator = document.querySelector('.status-indicator');
+                    const statusText = statusIndicator.nextSibling;
+                    statusIndicator.className = 'status-indicator status-active';
+                    statusText.textContent = ' Monitoramento Ativo';
+                } else {
+                    showAlert('Erro: ' + result.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('Erro de conexão: ' + error.message, 'danger');
+            });
+        }
+
+        // Parar monitoramento
+        function stopMonitoring() {
+            showAlert('Parando monitoramento automático...', 'info');
+            
+            fetch('/api/stop_monitoring', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    showAlert('Monitoramento parado com sucesso!', 'success');
+                    // Atualizar status imediatamente
+                    const statusIndicator = document.querySelector('.status-indicator');
+                    const statusText = statusIndicator.nextSibling;
+                    statusIndicator.className = 'status-indicator status-inactive';
+                    statusText.textContent = ' Monitoramento Inativo';
+                } else {
+                    showAlert('Erro: ' + result.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('Erro de conexão: ' + error.message, 'danger');
+            });
+        }
+
+        // Funções auxiliares
+        function showLoading(show) {
+            const loading = document.querySelector('.loading');
+            loading.style.display = show ? 'block' : 'none';
+        }
+
+        function showAlert(message, type) {
+            const alertsContainer = document.getElementById('alerts');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertsContainer.appendChild(alertDiv);
+            
+            // Auto-remover após 5 segundos
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+
+        // Função para atualizar a seção Última Análise
+        function updateLatestAnalysis(data) {
+            if (!data) return;
+            
+            // Atualizar timestamp
+            const timestampElement = document.querySelector('.card-header small');
+            if (timestampElement && data.timestamp) {
+                timestampElement.textContent = data.timestamp.substring(0, 19).replace('T', ' ');
+            }
+            
+            // Atualizar preço sugerido
+            const priceElement = document.querySelector('.price-highlight');
+            if (priceElement && data.pricing_suggestion && data.pricing_suggestion.suggested_price) {
+                priceElement.textContent = `R$ ${data.pricing_suggestion.suggested_price.toFixed(2)}`;
+            }
+            
+            // Atualizar probabilidade de chuva
+            const rainElements = document.querySelectorAll('h6');
+            if (data.weather_data && data.weather_data.length > 0) {
+                const rainProb = data.weather_data[0].rain_probability;
+                rainElements.forEach(el => {
+                    if (el.textContent.includes('% de chuva')) {
+                        el.textContent = `${rainProb}% de chuva`;
+                    }
+                });
+                
+                // Atualizar ícone do clima
+                const weatherIcon = document.querySelector('.weather-icon i');
+                if (weatherIcon) {
+                    weatherIcon.className = '';
+                    if (rainProb <= 30) {
+                        weatherIcon.className = 'fas fa-sun text-warning';
+                    } else if (rainProb <= 60) {
+                        weatherIcon.className = 'fas fa-cloud-sun text-info';
+                    } else {
+                        weatherIcon.className = 'fas fa-cloud-rain text-primary';
+                    }
+                }
+            }
+            
+            // Atualizar desconto aplicado
+            const adjustmentElement = document.querySelector('.h4.text-info');
+            if (adjustmentElement && data.pricing_suggestion && data.pricing_suggestion.discount_percentage) {
+                adjustmentElement.textContent = `${data.pricing_suggestion.discount_percentage.toFixed(1)}%`;
+            }
+            
+            // Atualizar estratégia
+            const strategyElement = document.querySelector('.text-muted');
+            if (strategyElement && data.pricing_suggestion && data.pricing_suggestion.strategy) {
+                strategyElement.textContent = data.pricing_suggestion.strategy;
+            }
+            
+            // Atualizar justificativa do desconto
+            const justificationAlert = document.querySelector('.alert.alert-info');
+            if (justificationAlert && data.pricing_suggestion && data.pricing_suggestion.discount_justification) {
+                const iconElement = justificationAlert.querySelector('i');
+                justificationAlert.innerHTML = '';
+                if (iconElement) {
+                    justificationAlert.appendChild(iconElement.cloneNode(true));
+                    justificationAlert.appendChild(document.createTextNode(' ' + data.pricing_suggestion.discount_justification));
+                } else {
+                    justificationAlert.innerHTML = '<i class="fas fa-info-circle me-2"></i>' + data.pricing_suggestion.discount_justification;
+                }
+            }
+            
+            // Atualizar datas do período
+            const allH6 = document.querySelectorAll('h6');
+            let periodSection = null;
+            
+            allH6.forEach(h6 => {
+                if (h6.textContent.trim() === 'Período da Análise') {
+                    periodSection = h6;
+                }
+            });
+            
+            if (periodSection) {
+                const parentDiv = periodSection.parentElement;
+                const paragraphs = parentDiv.querySelectorAll('p');
+                
+                if (paragraphs.length >= 3 && data.checkin && data.checkout && data.adults) {
+                    paragraphs[0].innerHTML = `<strong>Check-in:</strong> ${data.checkin}`;
+                    paragraphs[1].innerHTML = `<strong>Check-out:</strong> ${data.checkout}`;
+                    paragraphs[2].innerHTML = `<strong>Adultos:</strong> ${data.adults}`;
+                }
+            }
+        }
+        
+        // Função para abrir modal do calendário
+        function openCalendarModal() {
+            document.getElementById('calendarModal').style.display = 'block';
+            generateCalendarInModal();
+        }
+        
+        // Função para fechar modal do calendário
+        function closeCalendarModal() {
+            document.getElementById('calendarModal').style.display = 'none';
+        }
+        
+        // Variáveis do calendário modal
+        let modalCurrentDate = new Date();
+        let modalCurrentMonth = modalCurrentDate.getMonth();
+        let modalCurrentYear = modalCurrentDate.getFullYear();
+        let selectedStartDate = null;
+        let selectedEndDate = null;
+        
+        // Cache para dados da agenda (10 minutos)
+        let calendarCache = new Map();
+        const CACHE_DURATION = 10 * 60 * 1000; // 10 minutos em millisegundos
+        
+        const monthNames = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        
+        // Gerar calendário no modal
+        async function generateCalendarInModal() {
+            const firstDay = new Date(modalCurrentYear, modalCurrentMonth, 1).getDay();
+            const daysInMonth = new Date(modalCurrentYear, modalCurrentMonth + 1, 0).getDate();
+            const today = new Date();
+            
+            document.getElementById('modalMonthYear').textContent = `${monthNames[modalCurrentMonth]} ${modalCurrentYear}`;
+            
+            let calendarHTML = '';
+            let dayCount = 1;
+            
+            for (let week = 0; week < 6; week++) {
+                calendarHTML += '<div class="row">';
+                
+                for (let day = 0; day < 7; day++) {
+                    if (week === 0 && day < firstDay) {
+                        calendarHTML += '<div class="col modal-calendar-day"></div>';
+                    } else if (dayCount > daysInMonth) {
+                        calendarHTML += '<div class="col modal-calendar-day"></div>';
+                    } else {
+                        const currentDateObj = new Date(modalCurrentYear, modalCurrentMonth, dayCount);
+                        const isToday = currentDateObj.toDateString() === today.toDateString();
+                        const isWeekend = day === 0 || day === 6;
+                        const dateStr = `${modalCurrentYear}-${String(modalCurrentMonth + 1).padStart(2, '0')}-${String(dayCount).padStart(2, '0')}`;
+                        
+                        let dayClass = 'col modal-calendar-day clickable-day';
+                        if (isToday) dayClass += ' today';
+                        if (isWeekend) dayClass += ' weekend';
+                        
+                        calendarHTML += `
+                            <div class="${dayClass}" data-date="${dateStr}" onclick="selectDate('${dateStr}')">
+                                <div class="day-number">${dayCount}</div>
+                                <div class="price-container" id="modal-price-${modalCurrentYear}-${modalCurrentMonth}-${dayCount}">
+                                    <div class="price-tag">R$ ---</div>
+                                </div>
+                                <div class="weather-icon" id="modal-weather-${modalCurrentYear}-${modalCurrentMonth}-${dayCount}">
+                                    <i class="fas fa-question-circle text-muted"></i>
+                                </div>
+                            </div>
+                        `;
+                        dayCount++;
+                    }
+                }
+                
+                calendarHTML += '</div>';
+                if (dayCount > daysInMonth) break;
+            }
+            
+            document.getElementById('modalCalendarDays').innerHTML = calendarHTML;
+            await loadModalCalendarPrices();
+        }
+        
+        // Carregar preços no modal
+        async function loadModalCalendarPrices(forceRefresh = false) {
+            const cacheKey = `${modalCurrentYear}-${modalCurrentMonth + 1}`;
+            const now = Date.now();
+            
+            // Verificar cache se não for atualização forçada
+            if (!forceRefresh && calendarCache.has(cacheKey)) {
+                const cached = calendarCache.get(cacheKey);
+                if (now - cached.timestamp < CACHE_DURATION) {
+                    console.log('Usando dados do cache para:', cacheKey);
+                    displayCalendarData(cached.data);
+                    return Promise.resolve();
+                }
+            }
+            
+            try {
+                console.log('Carregando dados da API para:', cacheKey);
+                const response = await fetch(`/api/get_calendar_data?month=${modalCurrentMonth + 1}&year=${modalCurrentYear}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    // Armazenar no cache
+                    calendarCache.set(cacheKey, {
+                        data: result.data,
+                        timestamp: now
+                    });
+                    
+                    displayCalendarData(result.data);
+                    return Promise.resolve();
+                } else {
+                    throw new Error('Dados inválidos recebidos da API');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar preços do modal:', error);
+                return Promise.reject(error);
+            }
+        }
+        
+        // Função para exibir dados do calendário
+        function displayCalendarData(data) {
+            data.forEach(dayData => {
+                const { day, price, discount, weather_icon, weather_class, rain_probability } = dayData;
+                
+                const priceContainer = document.getElementById(`modal-price-${modalCurrentYear}-${modalCurrentMonth}-${day}`);
+                if (priceContainer) {
+                    priceContainer.innerHTML = `
+                        <div class="price-tag">R$ ${price}</div>
+                        <div class="discount-badge">${discount.toFixed(0)}% off</div>
+                    `;
+                }
+                
+                const weatherContainer = document.getElementById(`modal-weather-${modalCurrentYear}-${modalCurrentMonth}-${day}`);
+                if (weatherContainer) {
+                    weatherContainer.innerHTML = `<i class="${weather_icon} ${weather_class}" title="${rain_probability.toFixed(0)}% chance de chuva"></i>`;
+                }
+            });
+        }
+        
+        // Função para mostrar loading nos preços
+        function showPriceLoading() {
+            const calendarDays = document.querySelectorAll('[id^="modal-price-"]');
+            calendarDays.forEach(container => {
+                if (container) {
+                    container.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i></div>';
+                }
+            });
+        }
+        
+        // Função para atualizar dados forçadamente
+        function refreshCalendarData() {
+            const refreshBtn = document.querySelector('button[onclick="refreshCalendarData()"]');
+            const originalContent = refreshBtn.innerHTML;
+            
+            // Mostrar loading no botão
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
+            refreshBtn.disabled = true;
+            
+            // Mostrar loading nos preços
+            showPriceLoading();
+            
+            // Carregar dados
+            loadModalCalendarPrices(true).then(() => {
+                // Restaurar botão
+                refreshBtn.innerHTML = originalContent;
+                refreshBtn.disabled = false;
+            }).catch((error) => {
+                // Restaurar botão mesmo em caso de erro
+                refreshBtn.innerHTML = originalContent;
+                refreshBtn.disabled = false;
+                
+                // Mostrar erro
+                alert('Erro ao atualizar dados: ' + error.message);
+            });
+        }
+        
+        // Selecionar data no calendário
+        function selectDate(dateStr) {
+            const clickedDate = new Date(dateStr);
+            
+            if (!selectedStartDate || (selectedStartDate && selectedEndDate)) {
+                // Primeira seleção ou reiniciar seleção
+                selectedStartDate = dateStr;
+                selectedEndDate = null;
+                updateDateSelection();
+            } else if (selectedStartDate && !selectedEndDate) {
+                // Segunda seleção
+                const startDate = new Date(selectedStartDate);
+                if (clickedDate >= startDate) {
+                    selectedEndDate = dateStr;
+                } else {
+                    selectedStartDate = dateStr;
+                    selectedEndDate = null;
+                }
+                updateDateSelection();
+                
+                if (selectedStartDate && selectedEndDate) {
+                    // Calcular preço total e mostrar resultado
+                    calculateTotalPrice();
+                }
+            }
+        }
+        
+        // Atualizar seleção visual das datas
+        function updateDateSelection() {
+            document.querySelectorAll('.modal-calendar-day').forEach(day => {
+                day.classList.remove('selected-start', 'selected-end', 'selected-range');
+            });
+            
+            if (selectedStartDate) {
+                const startElement = document.querySelector(`[data-date="${selectedStartDate}"]`);
+                if (startElement) startElement.classList.add('selected-start');
+            }
+            
+            if (selectedEndDate) {
+                const endElement = document.querySelector(`[data-date="${selectedEndDate}"]`);
+                if (endElement) endElement.classList.add('selected-end');
+                
+                // Marcar dias no intervalo
+                const start = new Date(selectedStartDate);
+                const end = new Date(selectedEndDate);
+                const current = new Date(start);
+                current.setDate(current.getDate() + 1);
+                
+                while (current < end) {
+                    const dateStr = current.toISOString().split('T')[0];
+                    const element = document.querySelector(`[data-date="${dateStr}"]`);
+                    if (element) element.classList.add('selected-range');
+                    current.setDate(current.getDate() + 1);
+                }
+            }
+        }
+        
+        // Calcular preço total do período selecionado
+        async function calculateTotalPrice() {
+            if (!selectedStartDate || !selectedEndDate) return;
+            
+            try {
+                const response = await fetch('/api/run_analysis', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        checkin: selectedStartDate,
+                        checkout: selectedEndDate,
+                        adults: 2
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    const suggestedPrice = result.data.pricing_suggestion?.suggested_price || 0;
+                    const competitorAverage = result.data.pricing_suggestion?.reference_avg || 
+                        (result.data.competitive_data ? 
+                        result.data.competitive_data.reduce((sum, comp) => sum + (comp.price_per_night || 0), 0) / result.data.competitive_data.length : 0);
+                    const discount = result.data.pricing_suggestion?.discount_percentage || 0;
+                    
+                    // Calcular número de noites
+                    const checkInDate = new Date(selectedStartDate);
+                    const checkOutDate = new Date(selectedEndDate);
+                    const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+                    
+                    // Calcular valores totais
+                    const totalSuggestedPrice = suggestedPrice * nights;
+                    const totalCompetitorPrice = competitorAverage * nights;
+                    
+                    // Mostrar resultado
+                    document.getElementById('priceResult').innerHTML = `
+                        <div class="alert alert-success">
+                            <h5><i class="fas fa-check-circle me-2"></i>Período Selecionado</h5>
+                            <p><strong>Check-in:</strong> ${selectedStartDate} | <strong>Check-out:</strong> ${selectedEndDate}</p>
+                            <hr>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <h6 class="text-primary">💰 Preço Sugerido (com desconto)</h6>
+                                    <h4 class="text-success">R$ ${suggestedPrice.toFixed(0)}</h4>
+                                    <small class="text-muted">Desconto aplicado: ${discount.toFixed(1)}%</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6 class="text-info">📊 Média dos Concorrentes</h6>
+                                    <h4 class="text-info">R$ ${competitorAverage.toFixed(0)}</h4>
+                                    <small class="text-muted">Baseado em ${result.data.competitive_data?.length || 0} anúncios</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6 class="text-success">💵 Valor Total Diárias Sugerida</h6>
+                                    <h4 class="text-success">R$ ${totalSuggestedPrice.toFixed(0)}</h4>
+                                    <small class="text-muted">${nights} noite${nights !== 1 ? 's' : ''}</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6 class="text-warning">💸 Valor Total Diárias Concorrentes</h6>
+                                    <h4 class="text-warning">R$ ${totalCompetitorPrice.toFixed(0)}</h4>
+                                    <small class="text-muted">${nights} noite${nights !== 1 ? 's' : ''}</small>
+                                </div>
+                            </div>
+                            <hr>
+                            <button class="btn btn-primary" onclick="confirmDateSelection()">Usar estas datas</button>
+                            <button class="btn btn-outline-secondary ms-2" onclick="clearSelection()">Limpar seleção</button>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('priceResult').innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Não foi possível calcular o preço para este período.
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao calcular preço:', error);
+                document.getElementById('priceResult').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle me-2"></i>Erro ao calcular preço. Tente novamente.
+                    </div>
+                `;
+            }
+        }
+        
+        // Confirmar seleção de datas
+        function confirmDateSelection() {
+            if (selectedStartDate && selectedEndDate) {
+                document.getElementById('checkin').value = selectedStartDate;
+                document.getElementById('checkout').value = selectedEndDate;
+                
+                // Atualizar select de período
+                const periodSelect = document.getElementById('periodSelect');
+                const customOption = new Option(`${selectedStartDate} - ${selectedEndDate} (Personalizado)`, 'custom');
+                periodSelect.add(customOption);
+                periodSelect.value = 'custom';
+                
+                closeCalendarModal();
+            }
+        }
+        
+        // Limpar seleção
+        function clearSelection() {
+            selectedStartDate = null;
+            selectedEndDate = null;
+            updateDateSelection();
+            document.getElementById('priceResult').innerHTML = '';
+        }
+        
+        // Navegação do calendário modal
+        function modalPreviousMonth() {
+            modalCurrentMonth--;
+            if (modalCurrentMonth < 0) {
+                modalCurrentMonth = 11;
+                modalCurrentYear--;
+            }
+            generateCalendarInModal();
+        }
+        
+        function modalNextMonth() {
+            modalCurrentMonth++;
+            if (modalCurrentMonth > 11) {
+                modalCurrentMonth = 0;
+                modalCurrentYear++;
+            }
+            generateCalendarInModal();
+        }
+        
+        // Limpar cache expirado
+        function clearExpiredCache() {
+            const now = Date.now();
+            for (const [key, value] of calendarCache.entries()) {
+                if (now - value.timestamp >= CACHE_DURATION) {
+                    calendarCache.delete(key);
+                    console.log('Cache expirado removido:', key);
+                }
+            }
+        }
+        
+        // Limpar cache automaticamente a cada 5 minutos
+        setInterval(clearExpiredCache, 5 * 60 * 1000);
+        
+        // Funções para gerenciar localStorage do link do anúncio
+        function loadSavedUrl() {
+            const savedUrl = localStorage.getItem('airbnb_listing_url');
+            if (savedUrl) {
+                document.getElementById('listing_url').value = savedUrl;
+                document.getElementById('urlStatus').textContent = '(Link salvo automaticamente)';
+                document.getElementById('clearUrlBtn').style.display = 'block';
+            } else {
+                document.getElementById('clearUrlBtn').style.display = 'none';
+            }
+        }
+        
+        function saveUrl() {
+            const urlInput = document.getElementById('listing_url');
+            if (urlInput.value.trim()) {
+                localStorage.setItem('airbnb_listing_url', urlInput.value.trim());
+                document.getElementById('urlStatus').textContent = '(Link salvo automaticamente)';
+                document.getElementById('clearUrlBtn').style.display = 'block';
+            }
+        }
+        
+        function clearSavedUrl() {
+            localStorage.removeItem('airbnb_listing_url');
+            document.getElementById('listing_url').value = '';
+            document.getElementById('urlStatus').textContent = '';
+            document.getElementById('clearUrlBtn').style.display = 'none';
+        }
+        
+        // Carregar URL salva ao carregar a página
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSavedUrl();
+            
+            // Salvar URL automaticamente quando o usuário digitar
+            const urlInput = document.getElementById('listing_url');
+            urlInput.addEventListener('input', function() {
+                if (this.value.trim()) {
+                    saveUrl();
+                } else {
+                    clearSavedUrl();
+                }
+            });
+        });
+        
+        // Atualizar status a cada 30 segundos
+        setInterval(function() {
+            fetch('/api/get_latest')
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    const statusIndicator = document.querySelector('.status-indicator');
+                    const statusText = statusIndicator.nextSibling;
+                    
+                    if (result.monitoring_active) {
+                        statusIndicator.className = 'status-indicator status-active';
+                        statusText.textContent = ' Monitoramento Ativo';
+                    } else {
+                        statusIndicator.className = 'status-indicator status-inactive';
+                        statusText.textContent = ' Monitoramento Inativo';
+                    }
+                    
+                    // Atualizar dados da última análise se houver
+                    if (result.data) {
+                        updateLatestAnalysis(result.data);
+                    }
+                }
+            })
+            .catch(error => console.log('Erro ao verificar status:', error));
+        }, 30000);
+    </script>
+    
+    <!-- Modal do Calendário -->
+    <div id="calendarModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+        <div style="position: relative; margin: 2% auto; width: 90%; max-width: 1000px; background-color: white; border-radius: 10px; padding: 20px; max-height: 90vh; overflow-y: auto;">
+            <!-- Header do Modal -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4><i class="fas fa-calendar-alt me-2"></i>Selecionar Período na Agenda</h4>
+                <button type="button" class="btn-close" onclick="closeCalendarModal()"></button>
+            </div>
+            
+            <!-- Controles do Calendário -->
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary" onclick="modalPreviousMonth()">
+                            <i class="fas fa-chevron-left"></i> Anterior
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="modalNextMonth()">
+                            Próximo <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-4 text-center">
+                    <button type="button" class="btn btn-success" onclick="refreshCalendarData()" title="Atualizar preços e clima">
+                        <i class="fas fa-sync-alt"></i> Atualizar
+                    </button>
+                </div>
+                <div class="col-md-4 text-end">
+                    <h5 id="modalMonthYear" class="mb-0">Janeiro 2025</h5>
+                </div>
+            </div>
+            
+            <!-- Instruções -->
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Como usar:</strong> Clique em uma data para check-in e depois em outra para check-out. O preço total será calculado automaticamente.
+            </div>
+            
+            <!-- Calendário -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <!-- Cabeçalho dos dias da semana -->
+                    <div class="row">
+                        <div class="col text-center fw-bold py-2 border">Dom</div>
+                        <div class="col text-center fw-bold py-2 border">Seg</div>
+                        <div class="col text-center fw-bold py-2 border">Ter</div>
+                        <div class="col text-center fw-bold py-2 border">Qua</div>
+                        <div class="col text-center fw-bold py-2 border">Qui</div>
+                        <div class="col text-center fw-bold py-2 border">Sex</div>
+                        <div class="col text-center fw-bold py-2 border">Sáb</div>
+                    </div>
+                    
+                    <!-- Dias do calendário -->
+                    <div id="modalCalendarDays">
+                        <!-- Conteúdo gerado dinamicamente -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Resultado do Preço -->
+            <div id="priceResult"></div>
+            
+            <!-- Legenda -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Legenda</h6>
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <i class="fas fa-sun text-warning me-2"></i>Sol
+                                </div>
+                                <div class="col-md-3">
+                                    <i class="fas fa-cloud-sun text-info me-2"></i>Parcialmente nublado
+                                </div>
+                                <div class="col-md-3">
+                                    <i class="fas fa-cloud-rain text-primary me-2"></i>Chuva
+                                </div>
+                                <div class="col-md-3">
+                                    <span class="badge bg-warning">Fins de semana</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        .modal-calendar-day {
+            min-height: 100px;
+            border: 1px solid #dee2e6;
+            padding: 8px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .clickable-day {
+            cursor: pointer;
+        }
+        
+        .clickable-day:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .selected-start {
+            background-color: #d1ecf1 !important;
+            border: 2px solid #bee5eb !important;
+        }
+        
+        .selected-end {
+            background-color: #d1ecf1 !important;
+            border: 2px solid #bee5eb !important;
+        }
+        
+        .selected-range {
+            background-color: #e7f3ff !important;
+        }
+        
+        .day-number {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+        
+        .price-tag {
+            background: linear-gradient(135deg, #FF5A5F, #FF8E8E);
+            color: white;
+            padding: 3px 6px;
+            border-radius: 8px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-bottom: 3px;
+            display: inline-block;
+        }
+        
+        .discount-badge {
+            background-color: #28a745;
+            color: white;
+            font-size: 0.6em;
+            padding: 1px 4px;
+            border-radius: 6px;
+            margin-top: 2px;
+        }
+        
+        .weather-icon {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 1em;
+        }
+        
+        .weekend {
+            background-color: #fff3cd;
+        }
+        
+        .today {
+            background-color: #d1ecf1;
+            border: 2px solid #bee5eb;
+        }
+    </style>
+</body>
+</html>

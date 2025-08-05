@@ -47,10 +47,5 @@
       "src": "/api/(.*)",
       "dest": "/api/app"
     }
-  ],
-  "functions": {
-    "api/*.py": {
-      "runtime": "python3.9"
-    }
-  }
+  ]
 }

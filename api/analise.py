@@ -16,5 +16,4 @@ def analise():
 
 # Handler para Vercel
 def handler(request):
-    with app.request_context(request.environ):
-        return app.full_dispatch_request()
+    return app(request.environ, lambda status, headers: None)

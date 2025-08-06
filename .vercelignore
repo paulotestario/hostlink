@@ -3,12 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Ambientes virtuais
+# Virtual environments
 venv/
 env/
 ENV/
 
-# IDE e SO
+# IDE and OS
 .vscode/
 .idea/
 .DS_Store

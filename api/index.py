@@ -15,5 +15,5 @@ def index():
     return render_template('index.html')
 
 # Handler para Vercel
-def handler(request, response):
-    return app(request.environ, lambda status, headers: response.status_code)
+def handler(request):
+    return app(request.environ, lambda status, headers: None)

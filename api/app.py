@@ -195,8 +195,8 @@ def monitoring_status():
     })
 
 # Handler para Vercel
-def handler(request, response):
-    return app(request.environ, lambda status, headers: response.status_code)
+def handler(request):
+    return app(request.environ, lambda status, headers: None)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

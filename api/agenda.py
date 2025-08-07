@@ -15,15 +15,5 @@ def agenda():
     return render_template('agenda.html')
 
 # Handler para Vercel
-def handler(request):
-    from werkzeug.wrappers import Request, Response
-    
-    # Criar um objeto Request do Werkzeug
-    werkzeug_request = Request(request.environ)
-    
-    # Processar a requisição através do Flask
-    with app.request_context(werkzeug_request.environ):
-        response = app.full_dispatch_request()
-        
-    # Retornar a resposta
-    return response
+def handler(request, response):
+    return app(request.environ, lambda status, headers: response.status_code)

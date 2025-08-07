@@ -195,18 +195,8 @@ def monitoring_status():
     })
 
 # Handler para Vercel
-def handler(request):
-    from werkzeug.wrappers import Request, Response
-    
-    # Criar um objeto Request do Werkzeug
-    werkzeug_request = Request(request.environ)
-    
-    # Processar a requisição através do Flask
-    with app.request_context(werkzeug_request.environ):
-        response = app.full_dispatch_request()
-        
-    # Retornar a resposta
-    return response
+def handler(request, response):
+    return app(request.environ, lambda status, headers: response.status_code)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

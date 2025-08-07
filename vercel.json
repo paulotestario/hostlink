@@ -1,43 +1,12 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/*.py",
-      "use": "@vercel/python"
+    "version": 2,
+    "routes": [
+        {
+            "src": "/api/(.*)",
+            "dest": "/api/$1.js"
+        }
+    ],
+    "env": {
+        "API_URL": "https://…"
     }
-  ],
-  "routes": [
-    {
-      "src": "/",
-      "dest": "/api/index.py"
-    },
-    {
-      "src": "/agenda",
-      "dest": "/api/agenda.py"
-    },
-    {
-      "src": "/analise",
-      "dest": "/api/analise.py"
-    },
-    {
-      "src": "/similaridade",
-      "dest": "/api/similaridade.py"
-    },
-    {
-      "src": "/api/analyze",
-      "dest": "/api/analyze.py"
-    },
-    {
-      "src": "/api/similarity",
-      "dest": "/api/app.py"
-    },
-    {
-      "src": "/api/monitoring/(.*)",
-      "dest": "/api/app.py"
-    },
-    {
-      "src": "/static/(.*)",
-      "dest": "/static/$1"
-    }
-  ]
 }

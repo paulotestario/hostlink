@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste de Seleção Automática de Município</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .alert { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .alert-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Teste de Seleção Automática de Município</h1>
+        
+        <div class="form-group">
+            <label for="listing_url">URL do Anúncio Airbnb:</label>
+            <input type="url" id="listing_url" placeholder="Cole aqui o link do anúncio do Airbnb">
+        </div>
+        
+        <div class="form-group">
+            <label for="municipio">Município:</label>
+            <select id="municipio">
+                <option value="">Carregando municípios...</option>
+            </select>
+        </div>
+        
+        <button onclick="testMunicipioExtraction()">Testar Extração de Município</button>
+        
+        <div id="alerts"></div>
+        
+        <div style="margin-top: 30px;">
+            <h3>Como testar:</h3>
+            <ol>
+                <li>Cole um link de anúncio do Airbnb no campo acima</li>
+                <li>Clique em "Testar Extração de Município"</li>
+                <li>O sistema deve automaticamente selecionar o município correto no dropdown</li>
+            </ol>
+            
+            <h4>Links de exemplo para testar:</h4>
+            <ul>
+                <li>Qualquer link do Airbnb de Mangaratiba</li>
+                <li>Qualquer link do Airbnb de Itacuruçá</li>
+                <li>Qualquer link do Airbnb de Angra dos Reis</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // Função para mostrar alertas
+        function showAlert(message, type = 'info') {
+            const alertsContainer = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertsContainer.appendChild(alert);
+            
+            // Remover alerta após 5 segundos
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.parentNode.removeChild(alert);
+                }
+            }, 5000);
+        }
+        
+        // Função para carregar municípios
+        function loadMunicipios() {
+            console.log('Carregando municípios...');
+            fetch('/api/municipios/RJ')
+                .then(response => response.json())
+                .then(result => {
+                    const municipioSelect = document.getElementById('municipio');
+                    municipioSelect.innerHTML = '<option value="">Selecione um município</option>';
+                    
+                    if (result.success && result.municipios) {
+                        result.municipios.forEach(municipio => {
+                            const option = new Option(municipio.nome, municipio.id);
+                            municipioSelect.add(option);
+                        });
+                        showAlert('Municípios carregados com sucesso!', 'success');
+                    } else {
+                        municipioSelect.innerHTML = '<option value="">Erro ao carregar municípios</option>';
+                        showAlert('Erro ao carregar municípios', 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar municípios:', error);
+                    showAlert('Erro de conexão ao carregar municípios', 'danger');
+                });
+        }
+        
+        // Função para atualizar o dropdown de município
+        function updateMunicipioDropdown(municipioNome) {
+            console.log('Município extraído:', municipioNome);
+            
+            fetch(`/api/municipios/search?nome=${encodeURIComponent(municipioNome)}&estado=RJ`)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success && result.municipio) {
+                        const municipioSelect = document.getElementById('municipio');
+                        if (municipioSelect) {
+                            municipioSelect.value = result.municipio.id;
+                            showAlert(`Município "${result.municipio.nome}" selecionado automaticamente!`, 'success');
+                        }
+                    } else {
+                        showAlert(`Município "${municipioNome}" não encontrado na base de dados.`, 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar município:', error);
+                    showAlert('Erro ao buscar município', 'danger');
+                });
+        }
+        
+        // Função para testar a extração de município
+        function testMunicipioExtraction() {
+            const listingUrl = document.getElementById('listing_url').value;
+            
+            if (!listingUrl) {
+                showAlert('Por favor, insira uma URL do Airbnb', 'warning');
+                return;
+            }
+            
+            showAlert('Analisando anúncio...', 'info');
+            
+            // Simular análise do anúncio
+            fetch('/api/run_analysis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    checkin: '2024-12-20',
+                    checkout: '2024-12-22',
+                    adults: 2,
+                    beachfront: false,
+                    period_type: 'weekend',
+                    listing_url: listingUrl,
+                    municipio_id: null
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    if (result.extracted_municipality) {
+                        showAlert(`Município extraído: ${result.extracted_municipality}`, 'info');
+                        updateMunicipioDropdown(result.extracted_municipality);
+                    } else {
+                        showAlert('Nenhum município foi extraído do anúncio', 'warning');
+                    }
+                } else {
+                    showAlert('Erro na análise: ' + result.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('Erro de conexão: ' + error.message, 'danger');
+            });
+        }
+        
+        // Carregar municípios quando a página carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMunicipios();
+        });
+    </script>
+</body>
+</html>

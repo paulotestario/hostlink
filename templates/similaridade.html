@@ -589,14 +589,48 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    console.log('Favoritos sincronizados com sucesso');
+                    console.log('✅ Favoritos salvos no banco de dados:', data.message);
+                    
+                    // Mostrar notificação de sucesso
+                    if (data.saved_to_db > 0) {
+                        showNotification(`✅ ${data.saved_to_db} anúncio(s) salvo(s) para acompanhar! Veja em seu perfil.`, 'success');
+                    }
+                    
+                    // Mostrar avisos se houver erros
+                    if (data.errors && data.errors.length > 0) {
+                        console.warn('⚠️ Alguns erros ocorreram:', data.errors);
+                        showNotification(`⚠️ ${data.errors.length} erro(s) durante o salvamento`, 'warning');
+                    }
                 } else {
-                    console.error('Erro ao sincronizar favoritos:', data.error);
+                    console.error('❌ Erro ao sincronizar favoritos:', data.error);
+                    showNotification('❌ Erro ao salvar favoritos', 'error');
                 }
             })
             .catch(error => {
-                console.error('Erro na sincronização:', error);
+                console.error('❌ Erro na sincronização:', error);
+                showNotification('❌ Erro de conexão ao salvar favoritos', 'error');
             });
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Criar elemento de notificação
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'danger'} alert-dismissible fade show`;
+            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            // Adicionar ao body
+            document.body.appendChild(notification);
+            
+            // Remover automaticamente após 5 segundos
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
         }
 
         // Inicializar favoritos ao carregar a página

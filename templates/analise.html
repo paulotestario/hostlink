@@ -79,6 +79,19 @@
     </nav>
 
     <div class="container mt-4">
+        <!-- Botão de Atualizar Dados -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="mb-0">Análise Detalhada</h2>
+                    <button type="button" class="btn btn-primary" id="updateDataBtn" onclick="updateDataFromInternet()">
+                        <i class="fas fa-sync-alt me-2"></i>Atualizar Dados
+                    </button>
+                </div>
+                <hr>
+            </div>
+        </div>
+        
         {% if analysis_data %}
         <!-- Resumo Principal -->
         <div class="row mb-4">
@@ -493,6 +506,42 @@
             }
         });
         {% endif %}
+
+        // Função para atualizar dados da internet
+         function updateDataFromInternet() {
+             const btn = document.getElementById('updateDataBtn');
+             const originalText = btn.innerHTML;
+             
+             // Mostrar loading
+             btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Atualizando...';
+             btn.disabled = true;
+             
+             // Fazer requisição para atualizar dados
+             fetch('/api/update-data', {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                 },
+             })
+             .then(response => response.json())
+             .then(data => {
+                 if (data.success) {
+                     // Recarregar a página para mostrar os novos dados
+                     location.reload();
+                 } else {
+                     alert('Erro ao atualizar dados: ' + (data.error || 'Erro desconhecido'));
+                 }
+             })
+             .catch(error => {
+                 console.error('Erro:', error);
+                 alert('Erro ao atualizar dados. Tente novamente.');
+             })
+             .finally(() => {
+                 // Restaurar botão
+                 btn.innerHTML = originalText;
+                 btn.disabled = false;
+             });
+         }
     </script>
 </body>
 </html>

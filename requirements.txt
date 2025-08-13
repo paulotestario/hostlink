@@ -9,3 +9,9 @@ markupsafe
 click
 itsdangerous
 blinker
+supabase
+python-dotenv
+flask-login
+google-auth
+google-auth-oauthlib
+google-auth-httplib2

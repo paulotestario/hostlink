@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - HostLink</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='hostlink-theme.css') }}" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            overflow: hidden;
+            max-width: 400px;
+            width: 100%;
+        }
+        .login-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        .login-body {
+            padding: 2rem;
+        }
+        .google-btn {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            width: 100%;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .google-btn:hover {
+            background: #3367d6;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.3);
+        }
+        .google-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .logo {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .alert {
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 1.5rem 0;
+        }
+        .feature-list li {
+            padding: 0.5rem 0;
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .feature-list i {
+            color: #28a745;
+            width: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <h2 class="mb-0">HostLink</h2>
+            <p class="mb-0 opacity-75">Análise de Preços Airbnb</p>
+        </div>
+        
+        <div class="login-body">
+            <!-- Mensagens Flash -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            {% if auth_configured %}
+                <div class="text-center mb-4">
+                    <h4>Bem-vindo!</h4>
+                    <p class="text-muted">Faça login para acessar suas análises</p>
+                </div>
+                
+                <a href="{{ url_for('auth_google') }}" class="google-btn text-decoration-none">
+                    <i class="fab fa-google"></i>
+                    Entrar com Google
+                </a>
+                
+                <ul class="feature-list">
+                    <li><i class="fas fa-chart-bar"></i> Análise competitiva de preços</li>
+                    <li><i class="fas fa-cloud-sun"></i> Previsão do tempo integrada</li>
+                    <li><i class="fas fa-calendar-alt"></i> Agenda de preços otimizada</li>
+                    <li><i class="fas fa-robot"></i> Monitoramento automático</li>
+                    <li><i class="fas fa-shield-alt"></i> Dados seguros e privados</li>
+                </ul>
+            {% else %}
+                <div class="text-center mb-4">
+                    <h4>Configuração Necessária</h4>
+                    <p class="text-muted">A autenticação Google não está configurada</p>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Administrador:</strong> Configure as credenciais do Google OAuth no arquivo .env
+                </div>
+                
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title">Variáveis necessárias:</h6>
+                        <code class="d-block mb-2">GOOGLE_CLIENT_ID=seu_client_id</code>
+                        <code class="d-block mb-2">GOOGLE_CLIENT_SECRET=seu_client_secret</code>
+                        <code class="d-block">GOOGLE_REDIRECT_URI=http://localhost:5000/auth/callback</code>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Consulte a documentação para configurar o Google OAuth
+                    </small>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

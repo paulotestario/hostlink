@@ -1447,7 +1447,11 @@ class AirbnbClimateScraper:
                 'total_price': 0,
                 'listing_url': listing_url,
                 'image_url': '',
-                'municipality': None
+                'municipality': None,
+                'property_type': 'Casa',
+                'max_guests': 2,
+                'bedrooms': 1,
+                'bathrooms': 1
             }
             
             # Extrair título
@@ -1459,6 +1463,9 @@ class AirbnbClimateScraper:
             municipality = self._extract_municipality(soup)
             listing_data['municipality'] = municipality
             print(f"🏙️ Município identificado: {municipality}")
+            
+            # Extrair informações adicionais do anúncio
+            self._extract_listing_details(soup, listing_data)
             
             # Extrair preço do Airbnb com padrões mais específicos
             page_text = soup.get_text()
@@ -1660,11 +1667,141 @@ class AirbnbClimateScraper:
             print(f"❌ Erro ao analisar anúncio específico: {str(e)}")
             return []
     
+    def _extract_listing_details(self, soup, listing_data):
+        """
+        Extrai detalhes adicionais do anúncio como quartos, banheiros, hóspedes e tipo de propriedade
+        """
+        try:
+            page_text = soup.get_text()
+            
+            # Extrair capacidade de hóspedes
+            guest_patterns = [
+                r'(\d+)\s+hóspedes?',
+                r'até\s+(\d+)\s+pessoas?',
+                r'acomoda\s+(\d+)\s+pessoas?',
+                r'(\d+)\s+pessoas?',
+                r'(\d+)\s+guests?'
+            ]
+            
+            for pattern in guest_patterns:
+                match = re.search(pattern, page_text, re.IGNORECASE)
+                if match:
+                    guests = int(match.group(1))
+                    if 1 <= guests <= 20:  # Validação razoável
+                        listing_data['max_guests'] = guests
+                        print(f"👥 Capacidade: {guests} hóspedes")
+                        break
+            
+            # Extrair número de quartos
+            bedroom_patterns = [
+                r'(\d+)\s+quartos?',
+                r'(\d+)\s+bedrooms?',
+                r'(\d+)\s+suítes?',
+                r'(\d+)\s+dormitórios?'
+            ]
+            
+            for pattern in bedroom_patterns:
+                match = re.search(pattern, page_text, re.IGNORECASE)
+                if match:
+                    bedrooms = int(match.group(1))
+                    if 0 <= bedrooms <= 10:  # Validação razoável
+                        listing_data['bedrooms'] = bedrooms
+                        print(f"🛏️ Quartos: {bedrooms}")
+                        break
+            
+            # Extrair número de banheiros
+            bathroom_patterns = [
+                r'(\d+)\s+banheiros?',
+                r'(\d+)\s+bathrooms?',
+                r'(\d+)\s+lavabos?'
+            ]
+            
+            for pattern in bathroom_patterns:
+                match = re.search(pattern, page_text, re.IGNORECASE)
+                if match:
+                    bathrooms = int(match.group(1))
+                    if 0 <= bathrooms <= 10:  # Validação razoável
+                        listing_data['bathrooms'] = bathrooms
+                        print(f"🚿 Banheiros: {bathrooms}")
+                        break
+            
+            # Extrair tipo de propriedade
+            property_patterns = [
+                r'(Casa|Apartamento|Chalé|Pousada|Hotel|Quarto|Studio|Loft|Cobertura|Flat)\s+(?:inteira?|completa?|privada?)?',
+                r'(?:Entire|Private)\s+(house|apartment|home|condo|villa|cabin|chalet)',
+                r'(Residência|Moradia|Imóvel)\s+(?:inteira?|completa?)'
+            ]
+            
+            for pattern in property_patterns:
+                match = re.search(pattern, page_text, re.IGNORECASE)
+                if match:
+                    property_type = match.group(1).strip().title()
+                    # Mapear tipos em inglês para português
+                    type_mapping = {
+                        'House': 'Casa',
+                        'Apartment': 'Apartamento',
+                        'Home': 'Casa',
+                        'Condo': 'Apartamento',
+                        'Villa': 'Casa',
+                        'Cabin': 'Chalé',
+                        'Chalet': 'Chalé'
+                    }
+                    listing_data['property_type'] = type_mapping.get(property_type, property_type)
+                    print(f"🏠 Tipo: {listing_data['property_type']}")
+                    break
+            
+            # Buscar também em elementos específicos do DOM
+            # Procurar por elementos que contenham informações estruturadas
+            detail_elements = soup.find_all(['span', 'div', 'li'], text=re.compile(r'\d+\s+(quartos?|banheiros?|hóspedes?|guests?|bedrooms?|bathrooms?)'))
+            
+            for element in detail_elements:
+                element_text = element.get_text(strip=True)
+                
+                # Quartos
+                bedroom_match = re.search(r'(\d+)\s+(?:quartos?|bedrooms?|dormitórios?)', element_text, re.IGNORECASE)
+                if bedroom_match and listing_data['bedrooms'] == 1:  # Só atualizar se ainda for o valor padrão
+                    bedrooms = int(bedroom_match.group(1))
+                    if 0 <= bedrooms <= 10:
+                        listing_data['bedrooms'] = bedrooms
+                        print(f"🛏️ Quartos (DOM): {bedrooms}")
+                
+                # Banheiros
+                bathroom_match = re.search(r'(\d+)\s+(?:banheiros?|bathrooms?)', element_text, re.IGNORECASE)
+                if bathroom_match and listing_data['bathrooms'] == 1:  # Só atualizar se ainda for o valor padrão
+                    bathrooms = int(bathroom_match.group(1))
+                    if 0 <= bathrooms <= 10:
+                        listing_data['bathrooms'] = bathrooms
+                        print(f"🚿 Banheiros (DOM): {bathrooms}")
+                
+                # Hóspedes
+                guest_match = re.search(r'(\d+)\s+(?:hóspedes?|guests?|pessoas?)', element_text, re.IGNORECASE)
+                if guest_match and listing_data['max_guests'] == 2:  # Só atualizar se ainda for o valor padrão
+                    guests = int(guest_match.group(1))
+                    if 1 <= guests <= 20:
+                        listing_data['max_guests'] = guests
+                        print(f"👥 Hóspedes (DOM): {guests}")
+            
+        except Exception as e:
+            print(f"⚠️ Erro ao extrair detalhes do anúncio: {str(e)}")
+            # Manter valores padrão em caso de erro
+    
     def _extract_municipality(self, soup):
         """
         Extrai o município/cidade do anúncio do Airbnb
         """
         try:
+            # Primeiro, buscar pelo padrão específico do h2 "X noites em [Município]"
+            h2_elements = soup.find_all('h2')
+            for h2 in h2_elements:
+                h2_text = h2.get_text(strip=True)
+                # Padrão para capturar "2 noites em Mangaratiba" ou similar
+                nights_pattern = r'\d+\s+noites?\s+em\s+([A-ZÁÊÇÕ][a-záêçõ]+(?:\s+[a-záêçõ]+)*(?:\s+[A-ZÁÊÇÕ][a-záêçõ]+)*)'
+                match = re.search(nights_pattern, h2_text, re.IGNORECASE)
+                if match:
+                    municipality = match.group(1).strip().title()
+                    print(f"🎯 Município extraído do h2: {municipality}")
+                    return municipality
+            
             # Buscar por padrões de localização no HTML
             location_patterns = [
                 # Buscar por elementos com informações de localização

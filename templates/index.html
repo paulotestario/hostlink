@@ -94,6 +94,28 @@
                     <span class="status-indicator {{ 'status-active' if monitoring_active else 'status-inactive' }}"></span>
                     Monitoramento {{ 'Ativo' if monitoring_active else 'Inativo' }}
                 </span>
+                
+                <!-- Informações do usuário -->
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                        {% if current_user.profile_pic %}
+                            <img src="{{ current_user.profile_pic }}" alt="{{ current_user.name }}" class="rounded-circle me-2" width="32" height="32">
+                        {% else %}
+                            <i class="fas fa-user-circle me-2" style="font-size: 1.5rem;"></i>
+                        {% endif %}
+                        {{ current_user.name }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('perfil') }}">
+                            <i class="fas fa-user me-2"></i>Meu Perfil
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt me-2"></i>Sair
+                        </a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>
@@ -155,7 +177,14 @@
                                 </div>
                             </div>
                             <div class="row mt-3">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
+                                    <label class="form-label">Município</label>
+                                    <select class="form-control" id="municipio" name="municipio">
+                                        <option value="">Carregando municípios...</option>
+                                    </select>
+                                    <small class="text-muted">Selecione o município do anúncio</small>
+                                </div>
+                                <div class="col-md-4">
                                     <label class="form-label">Adultos</label>
                                     <select class="form-control" id="adults" name="adults">
                                         <option value="1">1 Adulto</option>
@@ -164,7 +193,7 @@
                                         <option value="4">4 Adultos</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="form-check mt-4">
                                         <input class="form-check-input" type="checkbox" id="beachfront" name="beachfront" checked>
                                         <label class="form-check-label" for="beachfront">
@@ -467,14 +496,25 @@
                 return;
             }
             
+            // Capturar valores diretamente dos elementos
+            const municipioSelect = document.getElementById('municipio');
+            const municipioId = municipioSelect.value ? parseInt(municipioSelect.value) : null;
+            
+            console.log('FormData municipio:', formData.get('municipio'));
+            console.log('Municipio select value:', municipioSelect.value);
+            console.log('Municipio ID processado:', municipioId);
+            
             const data = {
                 checkin: formData.get('checkin'),
                 checkout: formData.get('checkout'),
                 adults: parseInt(formData.get('adults')),
                 beachfront: formData.get('beachfront') === 'on',
                 period_type: selectedPeriod.type,
-                listing_url: formData.get('listing_url') || ''
+                listing_url: formData.get('listing_url') || '',
+                municipio_id: municipioId
             };
+            
+            console.log('Data sendo enviada:', data);
             
             showLoading(true);
             showAlert('Executando análise...', 'info');
@@ -491,6 +531,13 @@
                 showLoading(false);
                 if (result.success) {
                     showAlert('Análise executada com sucesso!', 'success');
+                    
+                    // Se um município foi extraído do anúncio, salvar no localStorage
+                    if (result.extracted_municipality) {
+                        localStorage.setItem('extracted_municipality', result.extracted_municipality);
+                        console.log('Município extraído salvo no localStorage:', result.extracted_municipality);
+                    }
+                    
                     // Recarregar a página após 2 segundos para mostrar os resultados
                     setTimeout(() => {
                         window.location.reload();
@@ -1074,9 +1121,64 @@
             document.getElementById('clearUrlBtn').style.display = 'none';
         }
         
+        // Função para carregar municípios
+        function loadMunicipios() {
+            console.log('Carregando municípios...');
+            fetch('/api/municipios/RJ')
+                .then(response => response.json())
+                .then(result => {
+                    console.log('Resposta da API de municípios:', result);
+                    const municipioSelect = document.getElementById('municipio');
+                    municipioSelect.innerHTML = '<option value="">Selecione um município</option>';
+                    
+                    if (result.success && result.municipios) {
+                        console.log('Adicionando', result.municipios.length, 'municípios ao dropdown');
+                        result.municipios.forEach(municipio => {
+                            const option = new Option(municipio.nome, municipio.id);
+                            municipioSelect.add(option);
+                        });
+                        
+                        // Selecionar Itacuruçá como padrão se existir
+                        const itacurucaOption = Array.from(municipioSelect.options).find(option => 
+                            option.text.toLowerCase().includes('itacuruçá')
+                        );
+                        if (itacurucaOption) {
+                            itacurucaOption.selected = true;
+                            console.log('Itacuruçá selecionado como padrão, ID:', itacurucaOption.value);
+                        }
+                        
+                        // Adicionar evento para debug quando o valor mudar
+                        municipioSelect.addEventListener('change', function() {
+                            console.log('Município selecionado:', this.value, this.options[this.selectedIndex].text);
+                        });
+                        console.log('Dropdown populado com sucesso');
+                    } else {
+                        console.error('Erro na resposta da API:', result);
+                        municipioSelect.innerHTML = '<option value="">Erro ao carregar municípios</option>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar municípios:', error);
+                    const municipioSelect = document.getElementById('municipio');
+                    municipioSelect.innerHTML = '<option value="">Erro ao carregar municípios</option>';
+                });
+        }
+        
         // Carregar URL salva ao carregar a página
         document.addEventListener('DOMContentLoaded', function() {
             loadSavedUrl();
+            loadMunicipios();
+            
+            // Verificar se há município extraído salvo e aplicá-lo após carregar os municípios
+            setTimeout(() => {
+                const extractedMunicipality = localStorage.getItem('extracted_municipality');
+                if (extractedMunicipality) {
+                    console.log('Aplicando município extraído salvo:', extractedMunicipality);
+                    updateMunicipioDropdown(extractedMunicipality);
+                    // Remover do localStorage após aplicar
+                    localStorage.removeItem('extracted_municipality');
+                }
+            }, 1000); // Aguardar 1 segundo para garantir que os municípios foram carregados
             
             // Salvar URL automaticamente quando o usuário digitar
             const urlInput = document.getElementById('listing_url');
@@ -1281,5 +1383,50 @@
             border: 2px solid #bee5eb;
         }
     </style>
+    
+    <script>
+        // Função de debug para testar valores do formulário
+        function testFormValues() {
+            const form = document.getElementById('analysisForm');
+            const formData = new FormData(form);
+            const municipioSelect = document.getElementById('municipio');
+            
+            console.log('=== DEBUG FORMULÁRIO ===');
+            console.log('FormData municipio:', formData.get('municipio'));
+            console.log('Select value:', municipioSelect.value);
+            console.log('Select selectedIndex:', municipioSelect.selectedIndex);
+            console.log('Selected option text:', municipioSelect.options[municipioSelect.selectedIndex]?.text);
+            console.log('Todas as opções:', Array.from(municipioSelect.options).map(opt => ({value: opt.value, text: opt.text})));
+            
+            alert(`Município selecionado: ${municipioSelect.value} (${municipioSelect.options[municipioSelect.selectedIndex]?.text})`);
+        }
+        
+        // Função para atualizar o dropdown de município com base no nome extraído
+        function updateMunicipioDropdown(municipioNome) {
+            console.log('Município extraído:', municipioNome);
+            
+            // Buscar o ID do município pelo nome
+            fetch(`/api/municipios/search?nome=${encodeURIComponent(municipioNome)}&estado=RJ`)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success && result.municipio) {
+                        const municipioSelect = document.getElementById('municipio');
+                        if (municipioSelect) {
+                            // Selecionar o município no dropdown
+                            municipioSelect.value = result.municipio.id;
+                            
+                            // Mostrar uma mensagem informativa
+                            showAlert(`Município "${result.municipio.nome}" selecionado automaticamente com base no anúncio.`, 'info');
+                        }
+                    } else {
+                        console.log('Município não encontrado na base de dados:', municipioNome);
+                        showAlert(`Município "${municipioNome}" extraído do anúncio, mas não encontrado na base de dados.`, 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar município:', error);
+                });
+        }
+    </script>
 </body>
 </html>

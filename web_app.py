@@ -199,6 +199,115 @@ def perfil():
         flash('Erro ao carregar dados do perfil', 'error')
         return redirect(url_for('index'))
 
+@app.route('/minhas_reservas')
+@app.route('/minhas-reservas')
+@login_required
+def minhas_reservas():
+    """Página das reservas do usuário"""
+    user_db_id = session.get('user_db_id')
+    if not user_db_id or not db:
+        flash('Erro ao carregar reservas do usuário', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        # Buscar todas as reservas do usuário
+        bookings = db.get_user_bookings(user_db_id)
+        
+        return render_template('minhas_reservas.html', 
+                             bookings=bookings,
+                             current_user=current_user)
+    except Exception as e:
+        print(f"❌ Erro ao carregar reservas: {e}")
+        flash('Erro ao carregar reservas', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/favoritos')
+@login_required
+def favoritos():
+    """Página de favoritos do usuário"""
+    return render_template('favoritos.html')
+
+@app.route('/hosting')
+@login_required
+def hosting():
+    """Página de hospedagem - gerenciar anúncios"""
+    user_db_id = session.get('user_db_id')
+    if not user_db_id or not db:
+        flash('Erro ao carregar página de hospedagem', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        # Buscar anúncios do usuário (apenas regulares, não favoritos de similaridade)
+        all_listings = db.get_user_listings(user_db_id)
+        user_listings = [l for l in all_listings if l.get('platform') != 'airbnb_similarity']
+        
+        return render_template('hosting.html', user_listings=user_listings)
+    except Exception as e:
+        print(f"❌ Erro ao carregar página de hospedagem: {e}")
+        flash('Erro ao carregar dados da hospedagem', 'error')
+        return render_template('hosting.html', user_listings=[])
+
+@app.route('/anuncios')
+def anuncios_publicos():
+    """Página pública para listar todos os anúncios disponíveis"""
+    try:
+        # Verificar se o usuário está logado
+        user_logged_in = current_user.is_authenticated
+        user_info = None
+        
+        if user_logged_in:
+            user_info = {
+                'id': current_user.id,
+                'name': current_user.name,
+                'email': current_user.email
+            }
+        
+        return render_template('anuncios_publicos.html', 
+                             user_logged_in=user_logged_in, 
+                             user_info=user_info)
+    except Exception as e:
+        print(f"❌ Erro ao carregar página de anúncios públicos: {e}")
+        return render_template('anuncios_publicos.html', 
+                             user_logged_in=False, 
+                             user_info=None)
+
+@app.route('/viagens')
+@login_required
+def viagens():
+    """Rota para viagens - redireciona para anúncios públicos"""
+    return redirect(url_for('anuncios_publicos'))
+
+@app.route('/anuncios/<int:listing_id>')
+def view_anuncio(listing_id):
+    """Página para visualizar um anúncio específico"""
+    try:
+        # Verificar se o usuário está logado
+        user_logged_in = current_user.is_authenticated
+        user_info = None
+        
+        if user_logged_in:
+            user_info = {
+                'id': current_user.id,
+                'name': current_user.name,
+                'email': current_user.email
+            }
+        
+        # Buscar o anúncio específico
+        listing = db.get_public_listing_by_id(listing_id)
+        
+        if not listing:
+            flash('Anúncio não encontrado', 'error')
+            return redirect(url_for('anuncios_publicos'))
+        
+        return render_template('view_anuncio.html', 
+                             listing=listing,
+                             user_logged_in=user_logged_in, 
+                             user_info=user_info)
+    except Exception as e:
+        print(f"❌ Erro ao carregar anúncio: {e}")
+        flash('Erro ao carregar anúncio', 'error')
+        return redirect(url_for('anuncios_publicos'))
+
 @app.route('/perfil/extract_listing_info', methods=['POST'])
 @login_required
 def extract_listing_info():
@@ -404,7 +513,278 @@ def delete_listing(listing_id):
         success = db.delete_user_listing(listing_id, user_db_id)
         return jsonify({'success': success})
     except Exception as e:
-        print(f"❌ Erro ao remover anúncio: {e}")
+        print(f"❌ Erro ao deletar anúncio: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+def upload_single_image(file):
+    """Função auxiliar para upload de uma única imagem"""
+    try:
+        if not file or file.filename == '':
+            return {'success': False, 'error': 'Nenhuma imagem selecionada'}
+        
+        # Verificar se é uma imagem válida
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+            return {'success': False, 'error': 'Formato de imagem não suportado'}
+        
+        # Criar diretório de uploads se não existir
+        upload_dir = os.path.join(app.static_folder, 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Gerar nome único para o arquivo
+        import uuid
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        file_path = os.path.join(upload_dir, unique_filename)
+        
+        # Salvar arquivo
+        file.save(file_path)
+        
+        # Retornar dados da imagem
+        return {
+            'success': True, 
+            'filename': unique_filename,
+            'url': f"/static/uploads/{unique_filename}"
+        }
+        
+    except Exception as e:
+        print(f"❌ Erro no upload de imagem: {e}")
+        return {'success': False, 'error': str(e)}
+
+@app.route('/api/upload_image', methods=['POST'])
+@login_required
+def upload_image():
+    """Upload de imagem para anúncio"""
+    try:
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'error': 'Nenhuma imagem enviada'})
+        
+        file = request.files['image']
+        result = upload_single_image(file)
+        
+        if result['success']:
+            return jsonify({'success': True, 'image_url': result['url']})
+        else:
+            return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ Erro no upload de imagem: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/hosting/listings', methods=['GET'])
+@login_required
+def get_user_listings():
+    """Busca todos os anúncios do usuário"""
+    user_db_id = session.get('user_db_id')
+    if not user_db_id or not db:
+        return jsonify({'success': False, 'error': 'Usuário não encontrado'})
+    
+    try:
+        listings = db.get_user_listings(user_db_id)
+        return jsonify({'success': True, 'listings': listings})
+    except Exception as e:
+        print(f"❌ Erro ao buscar anúncios: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/hosting/listing', methods=['POST'])
+@login_required
+def create_listing():
+    """Cria um novo anúncio"""
+    user_db_id = session.get('user_db_id')
+    if not user_db_id or not db:
+        return jsonify({'success': False, 'error': 'Usuário não encontrado'})
+    
+    try:
+        # Obter dados do formulário (FormData)
+        data = request.form.to_dict()
+        
+        # Validar dados obrigatórios
+        if not data.get('title'):
+            return jsonify({'success': False, 'error': 'Título é obrigatório'})
+        
+        # Processar upload de imagens
+        uploaded_images = []
+        if 'listingImages' in request.files:
+            files = request.files.getlist('listingImages')
+            for file in files:
+                if file and file.filename:
+                    try:
+                        # Usar a função de upload existente
+                        result = upload_single_image(file)
+                        if result['success']:
+                            uploaded_images.append(result['url'])
+                    except Exception as img_error:
+                        print(f"⚠️ Erro ao fazer upload da imagem: {img_error}")
+        
+        # Buscar município se fornecido
+        municipio_id = None
+        if data.get('municipio_nome'):
+            municipio = db.get_municipio_by_nome(data['municipio_nome'])
+            if municipio:
+                municipio_id = municipio['id']
+        
+        # Preparar dados para salvar
+        listing_data = {
+            'user_id': user_db_id,
+            'title': data['title'],
+            'url': data.get('url', ''),
+            'platform': data.get('platform', 'manual'),
+            'property_type': data.get('property_type', 'Casa'),
+            'max_guests': int(data['max_guests']) if data.get('max_guests') else 2,
+            'bedrooms': int(data['bedrooms']) if data.get('bedrooms') else 1,
+            'bathrooms': int(data['bathrooms']) if data.get('bathrooms') else 1,
+            'municipio_id': municipio_id,
+            'price_per_night': float(data.get('price_per_night', 0)),
+            'minimum_nights': int(data.get('minimum_nights', 1)),
+            'description': data.get('description', ''),
+            'address': data.get('address', ''),
+            'amenities': [],
+            'image_url': uploaded_images[0] if uploaded_images else (None if data.get('remove_existing_image') == 'true' else None),
+            'is_active': True
+        }
+        
+        # Salvar no banco
+        listing_id = db.save_user_listing(**listing_data)
+        
+        if listing_id:
+            return jsonify({'success': True, 'listing_id': listing_id})
+        else:
+            return jsonify({'success': False, 'error': 'Erro ao salvar anúncio'})
+            
+    except Exception as e:
+        print(f"❌ Erro ao criar anúncio: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/hosting/listing/<int:listing_id>', methods=['GET'])
+@login_required
+def get_listing_api(listing_id):
+    """Busca dados de um anúncio específico"""
+    user_db_id = session.get('user_db_id')
+    if not user_db_id or not db:
+        return jsonify({'success': False, 'error': 'Usuário não encontrado'})
+    
+    try:
+        # Buscar o anúncio específico
+        listings = db.get_user_listings(user_db_id)
+        listing = next((l for l in listings if l.get('id') == listing_id), None)
+        
+        if not listing:
+            return jsonify({'success': False, 'error': 'Anúncio não encontrado'})
+        
+
+        return jsonify({'success': True, 'listing': listing})
+    except Exception as e:
+        print(f"❌ Erro ao buscar anúncio: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/hosting/listing/<int:listing_id>', methods=['PUT'])
+@login_required
+def update_listing_api(listing_id):
+    """Atualiza um anúncio existente"""
+    user_db_id = session.get('user_db_id')
+    if not user_db_id or not db:
+        print(f"❌ Erro: Usuário não encontrado - user_db_id: {user_db_id}, db: {db}")
+        return jsonify({'success': False, 'error': 'Usuário não encontrado'})
+    
+    try:
+        print(f"🔍 Iniciando atualização do anúncio ID: {listing_id}")
+        
+        # Obter dados do FormData
+        data = request.form.to_dict()
+        print(f"📝 Dados recebidos do formulário: {data}")
+        
+        # Processar upload de imagens
+        uploaded_images = []
+        if 'images' in request.files:
+            files = request.files.getlist('images')
+            print(f"📸 Processando {len(files)} novas imagens")
+            for file in files:
+                if file and file.filename:
+                    try:
+                        result = upload_single_image(file)
+                        if result['success']:
+                            uploaded_images.append(result['url'])
+                            print(f"✅ Imagem carregada: {result['url']}")
+                    except Exception as img_error:
+                        print(f"⚠️ Erro ao fazer upload da imagem: {img_error}")
+        
+        # Buscar município se fornecido
+        municipio_id = None
+        if data.get('municipio_nome'):
+            print(f"🏙️ Buscando município: {data['municipio_nome']}")
+            municipio = db.get_municipio_by_nome(data['municipio_nome'])
+            if municipio:
+                municipio_id = municipio['id']
+                print(f"✅ Município encontrado - ID: {municipio_id}")
+            else:
+                print(f"⚠️ Município não encontrado: {data['municipio_nome']}")
+        
+        # Preparar dados para atualizar
+        listing_data = {
+            'title': data.get('title'),
+            'url': data.get('url'),
+            'platform': data.get('platform'),
+            'property_type': data.get('property_type'),
+            'max_guests': int(data['max_guests']) if data.get('max_guests') else None,
+            'bedrooms': int(data['bedrooms']) if data.get('bedrooms') else None,
+            'bathrooms': int(data['bathrooms']) if data.get('bathrooms') else None,
+            'municipio_id': municipio_id,
+            'price_per_night': float(data['price_per_night']) if data.get('price_per_night') else None,
+            'minimum_nights': int(data['minimum_nights']) if data.get('minimum_nights') else None,
+            'description': data.get('description'),
+            'address': data.get('address'),
+            'amenities': data.get('amenities'),
+            'is_active': data.get('is_active', True)
+        }
+        
+        # Lidar com image_url separadamente
+        if uploaded_images:
+            # Nova imagem foi carregada
+            listing_data['image_url'] = uploaded_images[0]
+        elif data.get('remove_existing_image') == 'true':
+            # Remover imagem existente
+            listing_data['image_url'] = None
+        # Se não há nova imagem e não está removendo, não incluir image_url na atualização
+        
+        # Remover campos None (exceto image_url se foi explicitamente removida)
+        if data.get('remove_existing_image') == 'true':
+            # Manter image_url=None para remover a imagem existente
+            listing_data = {k: v for k, v in listing_data.items() if v is not None or k == 'image_url'}
+        else:
+            listing_data = {k: v for k, v in listing_data.items() if v is not None}
+        print(f"📊 Dados preparados para atualização: {listing_data}")
+        
+        # Atualizar no banco
+        print(f"💾 Chamando db.update_user_listing({listing_id}, **listing_data)")
+        success = db.update_user_listing(listing_id, **listing_data)
+        print(f"📈 Resultado da atualização: {success}")
+        
+        if success:
+            print(f"✅ Anúncio {listing_id} atualizado com sucesso")
+        else:
+            print(f"❌ Falha ao atualizar anúncio {listing_id}")
+        
+        return jsonify({'success': success})
+            
+    except Exception as e:
+        print(f"❌ Erro ao atualizar anúncio: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/hosting/listing/<int:listing_id>', methods=['DELETE'])
+@login_required
+def delete_listing_api(listing_id):
+    """Remove um anúncio"""
+    user_db_id = session.get('user_db_id')
+    if not user_db_id or not db:
+        return jsonify({'success': False, 'error': 'Usuário não encontrado'})
+    
+    try:
+        success = db.delete_user_listing(listing_id, user_db_id)
+        return jsonify({'success': success})
+    except Exception as e:
+        print(f"❌ Erro ao deletar anúncio: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 def get_next_weekends_and_weekdays(months_ahead=1):
@@ -637,6 +1017,169 @@ def api_sync_favorites():
         
     except Exception as e:
         print(f"❌ Erro geral na sincronização de favoritos: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# =====================================================
+# NOVAS ROTAS DE API PARA FAVORITOS (BANCO DE DADOS)
+# =====================================================
+
+@app.route('/api/favorites/add', methods=['POST'])
+@login_required
+def api_add_favorite_db():
+    """API para adicionar anúncio aos favoritos (banco de dados)"""
+    try:
+        data = request.get_json()
+        listing_id = data.get('listing_id')
+        
+        if not listing_id:
+            return jsonify({
+                'success': False,
+                'error': 'ID do anúncio é obrigatório'
+            }), 400
+        
+        user_id = current_user.db_id
+        
+        # Verificar se o anúncio existe
+        listing = db.get_public_listing_by_id(listing_id)
+        if not listing:
+            return jsonify({
+                'success': False,
+                'error': 'Anúncio não encontrado'
+            }), 404
+        
+        # Adicionar aos favoritos
+        success = db.add_favorite(user_id, listing_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Anúncio adicionado aos favoritos',
+                'listing': {
+                    'id': listing['id'],
+                    'title': listing['title'],
+                    'url': listing['url']
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao adicionar aos favoritos'
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ Erro ao adicionar favorito: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/favorites/remove', methods=['POST'])
+@login_required
+def api_remove_favorite_db():
+    """API para remover anúncio dos favoritos (banco de dados)"""
+    try:
+        data = request.get_json()
+        listing_id = data.get('listing_id')
+        
+        if not listing_id:
+            return jsonify({
+                'success': False,
+                'error': 'ID do anúncio é obrigatório'
+            }), 400
+        
+        user_id = current_user.db_id
+        
+        # Remover dos favoritos
+        success = db.remove_favorite(user_id, listing_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Anúncio removido dos favoritos'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao remover dos favoritos'
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ Erro ao remover favorito: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/favorites/list', methods=['GET'])
+@login_required
+def api_list_favorites_db():
+    """API para listar favoritos do usuário (banco de dados)"""
+    try:
+        user_id = current_user.db_id
+        favorites = db.get_user_favorites(user_id)
+        
+        # Formatar dados para o frontend
+        formatted_favorites = []
+        for fav in favorites:
+            listing = fav.get('user_listings', {})
+            municipio = listing.get('municipios', {})
+            
+            formatted_favorites.append({
+                'favorite_id': fav['id'],
+                'listing_id': listing.get('id'),
+                'title': listing.get('title', 'Título não disponível'),
+                'url': listing.get('url'),
+                'price_per_night': listing.get('price_per_night'),
+                'rating': listing.get('rating'),
+                'reviews': listing.get('reviews'),
+                'image_url': listing.get('image_url'),
+                'location': municipio.get('nome') if municipio else 'Localização não informada',
+                'state': municipio.get('estado') if municipio else '',
+                'is_beachfront': listing.get('is_beachfront', False),
+                'platform': listing.get('platform', 'airbnb'),
+                'added_at': fav['created_at']
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': formatted_favorites,
+            'total': len(formatted_favorites)
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao listar favoritos: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/favorites/check', methods=['POST'])
+@login_required
+def api_check_favorite_db():
+    """API para verificar se um anúncio é favorito (banco de dados)"""
+    try:
+        data = request.get_json()
+        listing_id = data.get('listing_id')
+        
+        if not listing_id:
+            return jsonify({
+                'success': False,
+                'error': 'ID do anúncio é obrigatório'
+            }), 400
+        
+        user_id = current_user.db_id
+        is_favorite = db.is_favorite(user_id, listing_id)
+        
+        return jsonify({
+            'success': True,
+            'is_favorite': is_favorite
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao verificar favorito: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -1450,6 +1993,619 @@ def health_check():
             'timestamp': datetime.now().isoformat(),
             'error': str(e)
         }), 503
+
+# API Routes para Agenda/Disponibilidade
+@app.route('/api/agenda/availability', methods=['POST'])
+@login_required
+def save_availability():
+    """Salva disponibilidade de datas para um anúncio"""
+    try:
+        data = request.get_json()
+        listing_id = data.get('listing_id')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        price_per_night = data.get('price_per_night')
+        
+        if not all([listing_id, start_date, end_date, price_per_night]):
+            return jsonify({
+                'success': False,
+                'error': 'Todos os campos são obrigatórios'
+            }), 400
+        
+        # Verificar se o anúncio pertence ao usuário
+        user_db_id = session.get('user_db_id')
+        listings = db.get_user_listings(user_db_id)
+        if not any(l.get('id') == listing_id for l in listings):
+            return jsonify({
+                'success': False,
+                'error': 'Anúncio não encontrado'
+            }), 404
+        
+        # Salvar disponibilidade
+        success = db.save_listing_availability_period(
+            listing_id=listing_id,
+            user_id=user_db_id,
+            start_date=start_date,
+            end_date=end_date,
+            price_per_night=price_per_night
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Disponibilidade salva com sucesso'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao salvar disponibilidade'
+            }), 500
+        
+    except Exception as e:
+        print(f"❌ Erro ao salvar disponibilidade: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/agenda/availability/<int:listing_id>', methods=['GET'])
+@login_required
+def get_availability(listing_id):
+    """Busca disponibilidade de um anúncio"""
+    try:
+        # Verificar se o anúncio pertence ao usuário
+        user_db_id = session.get('user_db_id')
+        listings = db.get_user_listings(user_db_id)
+        if not any(l.get('id') == listing_id for l in listings):
+            return jsonify({
+                'success': False,
+                'error': 'Anúncio não encontrado'
+            }), 404
+        
+        availability = db.get_listing_availability(listing_id)
+        
+        return jsonify({
+            'success': True,
+            'availability': availability
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar disponibilidade: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/agenda/available-dates/<int:listing_id>', methods=['GET'])
+@login_required
+def get_available_dates(listing_id):
+    """Busca datas disponíveis para reserva"""
+    try:
+        # Verificar se o anúncio pertence ao usuário
+        user_db_id = session.get('user_db_id')
+        listings = db.get_user_listings(user_db_id)
+        if not any(l.get('id') == listing_id for l in listings):
+            return jsonify({
+                'success': False,
+                'error': 'Anúncio não encontrado'
+            }), 404
+        
+        # Definir período padrão (próximos 6 meses)
+        from datetime import datetime, timedelta
+        start_date = datetime.now().strftime('%Y-%m-%d')
+        end_date = (datetime.now() + timedelta(days=180)).strftime('%Y-%m-%d')
+        
+        available_dates = db.get_available_dates(listing_id, start_date, end_date)
+        
+        return jsonify({
+            'success': True,
+            'available_dates': available_dates
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar datas disponíveis: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/agenda/availability/<int:listing_id>/<date>', methods=['DELETE'])
+@login_required
+def delete_availability(listing_id, date):
+    """Remove disponibilidade de uma data específica"""
+    try:
+        # Verificar se o anúncio pertence ao usuário
+        user_db_id = session.get('user_db_id')
+        listings = db.get_user_listings(user_db_id)
+        if not any(l.get('id') == listing_id for l in listings):
+            return jsonify({
+                'success': False,
+                'error': 'Anúncio não encontrado'
+            }), 404
+        
+        # Remover disponibilidade
+        success = db.delete_listing_availability(
+            listing_id=listing_id,
+            date=date,
+            user_id=user_db_id
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Disponibilidade removida com sucesso'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao remover disponibilidade'
+            }), 500
+        
+    except Exception as e:
+        print(f"❌ Erro ao remover disponibilidade: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/agenda/booking', methods=['POST'])
+@login_required
+def create_booking():
+    """Cria uma nova reserva"""
+    try:
+        data = request.get_json()
+        listing_id = data.get('listing_id')
+        guest_user_id = data.get('guest_user_id')
+        checkin_date = data.get('checkin_date')
+        checkout_date = data.get('checkout_date')
+        total_price = data.get('total_price')
+        guest_count = data.get('guest_count', 1)
+        
+        if not all([listing_id, guest_user_id, checkin_date, checkout_date, total_price]):
+            return jsonify({
+                'success': False,
+                'error': 'Todos os campos são obrigatórios'
+            }), 400
+        
+        # Salvar reserva
+        booking_id = db.save_booking(
+            listing_id=listing_id,
+            guest_user_id=guest_user_id,
+            checkin_date=checkin_date,
+            checkout_date=checkout_date,
+            total_price=total_price,
+            guest_count=guest_count
+        )
+        
+        return jsonify({
+            'success': True,
+            'booking_id': booking_id,
+            'message': 'Reserva criada com sucesso'
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao criar reserva: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/agenda/bookings/<int:listing_id>', methods=['GET'])
+@login_required
+def get_bookings(listing_id):
+    """Busca reservas de um anúncio (excluindo canceladas)"""
+    try:
+        # Verificar se o anúncio pertence ao usuário
+        user_db_id = session.get('user_db_id')
+        listings = db.get_user_listings(user_db_id)
+        if not any(l.get('id') == listing_id for l in listings):
+            return jsonify({
+                'success': False,
+                'error': 'Anúncio não encontrado'
+            }), 404
+        
+        # Buscar todas as reservas e filtrar canceladas
+        all_bookings = db.get_listing_bookings(listing_id)
+        bookings = [booking for booking in all_bookings if booking.get('status') != 'cancelled']
+        
+        return jsonify({
+            'success': True,
+            'bookings': bookings
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar reservas: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/agenda/recent-bookings/<int:listing_id>', methods=['GET'])
+@login_required
+def get_recent_bookings(listing_id):
+    """Busca todas as reservas de um anúncio (incluindo canceladas) para exibição recente"""
+    try:
+        # Verificar se o anúncio pertence ao usuário
+        user_db_id = session.get('user_db_id')
+        listings = db.get_user_listings(user_db_id)
+        if not any(l.get('id') == listing_id for l in listings):
+            return jsonify({
+                'success': False,
+                'error': 'Anúncio não encontrado'
+            }), 404
+        
+        # Buscar todas as reservas (incluindo canceladas)
+        bookings = db.get_listing_bookings(listing_id)
+        
+        return jsonify({
+            'success': True,
+            'bookings': bookings
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar reservas recentes: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/cancel-booking/<int:booking_id>', methods=['POST'])
+@login_required
+def cancel_booking(booking_id):
+    """Cancelar uma reserva - permitido para hóspede e anfitrião"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não autenticado'
+            }), 401
+        
+        # Buscar a reserva específica
+        booking_result = db.supabase.table('listing_bookings').select(
+            '*, user_listings(user_id, title)'
+        ).eq('id', booking_id).execute()
+        
+        if not booking_result.data:
+            return jsonify({
+                'success': False,
+                'error': 'Reserva não encontrada'
+            }), 404
+        
+        booking = booking_result.data[0]
+        
+        # Verificar se o usuário pode cancelar a reserva
+        # Pode cancelar se for:
+        # 1. O hóspede (guest_user_id)
+        # 2. O anfitrião (dono do anúncio)
+        can_cancel = (
+            booking.get('guest_user_id') == user_db_id or  # É o hóspede
+            booking.get('user_listings', {}).get('user_id') == user_db_id  # É o anfitrião
+        )
+        
+        if not can_cancel:
+            return jsonify({
+                'success': False,
+                'error': 'Você não tem permissão para cancelar esta reserva'
+            }), 403
+        
+        # Atualizar status da reserva para 'cancelled'
+        success = db.update_booking_status(booking_id, 'cancelled')
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Reserva cancelada com sucesso'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao cancelar reserva'
+            }), 500
+            
+    except Exception as e:
+        print(f"Erro ao cancelar reserva: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/confirm-booking/<int:booking_id>', methods=['POST'])
+@login_required
+def confirm_booking(booking_id):
+    """Confirmar uma reserva - permitido apenas para anfitrião"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não autenticado'
+            }), 401
+        
+        # Buscar a reserva específica
+        booking_result = db.supabase.table('listing_bookings').select(
+            '*, user_listings(user_id, title)'
+        ).eq('id', booking_id).execute()
+        
+        if not booking_result.data:
+            return jsonify({
+                'success': False,
+                'error': 'Reserva não encontrada'
+            }), 404
+        
+        booking = booking_result.data[0]
+        
+        # Verificar se o usuário é o anfitrião (dono do anúncio)
+        if booking.get('user_listings', {}).get('user_id') != user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Você não tem permissão para confirmar esta reserva'
+            }), 403
+        
+        # Verificar se a reserva está pendente
+        if booking.get('status') != 'pending':
+            return jsonify({
+                'success': False,
+                'error': 'Apenas reservas pendentes podem ser confirmadas'
+            }), 400
+        
+        # Atualizar status da reserva para 'confirmed'
+        success = db.update_booking_status(booking_id, 'confirmed')
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Reserva confirmada com sucesso'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao confirmar reserva'
+            }), 500
+            
+    except Exception as e:
+        print(f"Erro ao confirmar reserva: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/anuncios/todos', methods=['GET'])
+def get_all_listings():
+    """Buscar todos os anúncios públicos"""
+    try:
+        # Buscar todos os anúncios ativos
+        listings = db.get_all_public_listings()
+        return jsonify({
+            'success': True,
+            'listings': listings
+        })
+    except Exception as e:
+        print(f"❌ Erro ao buscar anúncios públicos: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/anuncios/disponiveis', methods=['GET'])
+def get_available_listings():
+    """Buscar anúncios disponíveis em uma data específica"""
+    try:
+        date = request.args.get('date')
+        if not date:
+            return jsonify({
+                'success': False,
+                'error': 'Data é obrigatória'
+            }), 400
+        
+        # Buscar anúncios disponíveis na data
+        listings = db.get_listings_available_on_date(date)
+        return jsonify({
+            'success': True,
+            'listings': listings,
+            'date': date
+        })
+    except Exception as e:
+        print(f"❌ Erro ao buscar anúncios disponíveis: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/anuncios/periodo', methods=['GET'])
+def get_listings_by_period():
+    """Buscar anúncios para um período específico com informação de disponibilidade"""
+    try:
+        data_inicio = request.args.get('data_inicio')
+        data_fim = request.args.get('data_fim')
+        
+        if not data_inicio or not data_fim:
+            return jsonify({
+                'success': False,
+                'message': 'Datas de início e fim são obrigatórias'
+            }), 400
+        
+        # Buscar todos os anúncios
+        all_listings = db.get_all_public_listings()
+        
+        # Para cada anúncio, verificar disponibilidade no período
+        listings_with_availability = []
+        for listing in all_listings:
+            # Verificar se está disponível no período
+            is_available = db.check_availability(listing['id'], data_inicio, data_fim)
+            
+            listing_data = dict(listing)
+            listing_data['available'] = is_available
+            
+            # Buscar período de disponibilidade contínua sempre
+            available_period = db.get_available_period(listing['id'], data_inicio)
+            if available_period:
+                listing_data['available_period'] = available_period
+            
+            # Se não disponível, buscar próxima data disponível
+            if not is_available:
+                next_available = db.get_next_available_date(listing['id'], data_inicio)
+                listing_data['next_available_date'] = next_available
+            
+            listings_with_availability.append(listing_data)
+        
+        return jsonify({
+            'success': True,
+            'listings': listings_with_availability
+        })
+        
+    except Exception as e:
+        print(f"Erro ao buscar anúncios por período: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Erro interno do servidor'
+        }), 500
+
+@app.route('/api/anuncios/reservar', methods=['POST'])
+def create_public_booking():
+    """Criar uma reserva pública"""
+    try:
+        data = request.get_json()
+        listing_id = data.get('listing_id')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        guest_name = data.get('guest_name')
+        guest_email = data.get('guest_email')
+        guest_phone = data.get('guest_phone')
+        
+        if not all([listing_id, start_date, end_date, guest_name, guest_email]):
+            return jsonify({
+                'success': False,
+                'error': 'Todos os campos obrigatórios devem ser preenchidos'
+            }), 400
+        
+        # Verificar disponibilidade
+        available = db.check_availability(listing_id, start_date, end_date)
+        if not available:
+            return jsonify({
+                'success': False,
+                'error': 'Datas não disponíveis para reserva'
+            }), 400
+        
+        # Criar reserva
+        booking_id = db.create_public_booking(
+            listing_id=listing_id,
+            start_date=start_date,
+            end_date=end_date,
+            guest_name=guest_name,
+            guest_email=guest_email,
+            guest_phone=guest_phone
+        )
+        
+        if booking_id:
+            return jsonify({
+                'success': True,
+                'booking_id': booking_id,
+                'message': 'Reserva criada com sucesso!'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao criar reserva'
+            }), 500
+        
+    except Exception as e:
+        print(f"❌ Erro ao criar reserva pública: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/anuncios/check-reservation/<int:listing_id>', methods=['GET'])
+@login_required
+def check_user_reservation(listing_id):
+    """Verificar se o usuário já tem uma reserva para este anúncio"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não encontrado na sessão'
+            }), 400
+        
+        # Verificar se existe reserva ativa para este usuário e anúncio
+        reservation = db.get_user_reservation_for_listing(user_db_id, listing_id)
+        
+        return jsonify({
+            'success': True,
+            'has_reservation': reservation is not None,
+            'reservation': reservation
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao verificar reserva: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/anuncios/reservar-autenticado', methods=['POST'])
+@login_required
+def create_authenticated_booking():
+    """Criar uma reserva para usuário autenticado"""
+    try:
+        data = request.get_json()
+        listing_id = data.get('listing_id')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        guests_count = data.get('guests_count', 1)
+        
+        if not all([listing_id, start_date, end_date]):
+            return jsonify({
+                'success': False,
+                'error': 'Todos os campos obrigatórios devem ser preenchidos'
+            }), 400
+        
+        # Verificar disponibilidade
+        available = db.check_availability(listing_id, start_date, end_date)
+        if not available:
+            return jsonify({
+                'success': False,
+                'error': 'Datas não disponíveis para reserva'
+            }), 400
+        
+        # Obter informações do usuário logado
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não encontrado na sessão'
+            }), 400
+        
+        # Criar reserva autenticada
+        booking_id = db.create_authenticated_booking(
+            listing_id=listing_id,
+            guest_user_id=user_db_id,
+            start_date=start_date,
+            end_date=end_date,
+            guest_name=current_user.name,
+            guest_email=current_user.email,
+            guests_count=guests_count
+        )
+        
+        if booking_id:
+            return jsonify({
+                'success': True,
+                'booking_id': booking_id,
+                'message': 'Reserva confirmada com sucesso!'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao criar reserva'
+            }), 500
+        
+    except Exception as e:
+        print(f"❌ Erro ao criar reserva autenticada: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/api/monitor')
 def api_monitor():

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Reservas - HostLink</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='hostlink-theme.css') }}">
+    <style>
+        .reservas-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .reservas-header h1 {
+            margin: 0;
+            font-size: 2rem;
+        }
+        
+        .reservas-header p {
+            margin: 0.5rem 0 0 0;
+            opacity: 0.9;
+        }
+        
+        .reserva-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+        
+        .reserva-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+        
+        .reserva-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+        }
+        
+        .reserva-status {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-confirmed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-cancelled {
+            background-color: #dc3545;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .reserva-card.cancelled {
+            background-color: white;
+            border-left-color: #dc3545;
+            border: 2px solid #dc3545;
+            opacity: 0.9;
+        }
+        
+        .reserva-card.cancelled .reserva-title {
+            color: #dc3545;
+            text-decoration: line-through;
+        }
+        
+        .reserva-card.cancelled .price-highlight {
+            color: #dc3545 !important;
+            text-decoration: line-through;
+        }
+        
+        .status-completed {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .reserva-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .detail-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 0.2rem;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        
+        .detail-value {
+            font-size: 1rem;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .reserva-dates {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        
+        .dates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+        
+        .date-item {
+            text-align: center;
+        }
+        
+        .date-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 0.3rem;
+        }
+        
+        .date-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .no-reservas {
+            text-align: center;
+            padding: 3rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .no-reservas h3 {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        
+        .no-reservas p {
+            color: #999;
+            margin-bottom: 2rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            color: white;
+            text-decoration: none;
+        }
+        
+        .municipio-info {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 0.3rem;
+        }
+        
+        .price-highlight {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header HostLink -->
+        <nav class="navbar navbar-expand-lg navbar-light">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('index') }}">
+                    <i class="fas fa-handshake me-2" style="color: #00A699;"></i>
+                    HOSTLINK
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('agenda') }}">
+                        <i class="fas fa-calendar-alt me-2"></i>Agenda de Preços
+                    </a>
+                    <a class="nav-link" href="{{ url_for('analise') }}">
+                        <i class="fas fa-chart-line me-2"></i>Análise Detalhada
+                    </a>
+                    <a class="nav-link" href="{{ url_for('similaridade') }}">
+                        <i class="fas fa-search me-2"></i>Análise de Similaridade
+                    </a>
+                    <a class="nav-link" href="{{ url_for('hosting') }}">
+                        <i class="fas fa-home me-2"></i>Hospedar
+                    </a>
+                    
+                    <!-- Informações do usuário -->
+                    {% if current_user %}
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            {% if current_user.picture %}
+                                <img src="{{ current_user.picture }}" alt="{{ current_user.name }}" class="rounded-circle me-2" width="32" height="32">
+                            {% else %}
+                                <i class="fas fa-user-circle me-2" style="font-size: 1.5rem;"></i>
+                            {% endif %}
+                            {{ current_user.name }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><span class="dropdown-item-text text-muted">{{ current_user.email }}</span></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('favoritos') }}"><i class="fas fa-heart me-2"></i>Favoritos</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('viagens') }}"><i class="fas fa-suitcase me-2"></i>Viagens</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}"><i class="fas fa-calendar-check me-2"></i>Minhas Reservas</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-comments me-2"></i>Mensagens</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('perfil') }}"><i class="fas fa-user me-2"></i>Perfil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-bell me-2"></i>Notificações <span class="badge bg-danger">1</span></a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Configurações da conta</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-question-circle me-2"></i>Central de Ajuda</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('agenda') }}"><i class="fas fa-calendar-alt me-2"></i>Agenda de Preços</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('analise') }}"><i class="fas fa-chart-line me-2"></i>Análise Detalhada</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('similaridade') }}"><i class="fas fa-search me-2"></i>Análise de Similaridade</a></li>
+                            <li><a class="dropdown-item text-muted" href="#"><i class="fas fa-exclamation-triangle me-2"></i>Monitoramento Inativo</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Sair da conta</a></li>
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+
+        <!-- Cabeçalho -->
+        <div class="reservas-header">
+            <h1>📅 Minhas Reservas</h1>
+            <p>Acompanhe todas as suas reservas e estadias</p>
+        </div>
+
+        <!-- Lista de Reservas -->
+        {% if bookings %}
+            {% for booking in bookings %}
+            <div class="reserva-card{% if booking.status == 'cancelled' %} cancelled{% endif %}">
+                <div class="reserva-header">
+                    <div>
+                        <h3 class="reserva-title">{{ booking.user_listings.title or 'Anúncio sem título' }}</h3>
+                        {% if booking.user_listings.municipios %}
+                        <div class="municipio-info">
+                            📍 {{ booking.user_listings.municipios.nome }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <span class="reserva-status status-{{ booking.status }}">
+                        {% if booking.status == 'pending' %}
+                            Pendente
+                        {% elif booking.status == 'confirmed' %}
+                            Confirmada
+                        {% elif booking.status == 'cancelled' %}
+                            Cancelada
+                        {% elif booking.status == 'completed' %}
+                            Concluída
+                        {% else %}
+                            {{ booking.status }}
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <div class="reserva-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Valor Total</span>
+                        <span class="detail-value price-highlight">R$ {{ "%.2f"|format(booking.total_price) }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Noites</span>
+                        <span class="detail-value">{{ booking.total_nights }} noite{{ 's' if booking.total_nights != 1 else '' }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Preço por Noite</span>
+                        <span class="detail-value">R$ {{ "%.2f"|format(booking.price_per_night) }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Status do Pagamento</span>
+                        <span class="detail-value">
+                            {% if booking.payment_status == 'pending' %}
+                                Pendente
+                            {% elif booking.payment_status == 'paid' %}
+                                Pago
+                            {% elif booking.payment_status == 'refunded' %}
+                                Reembolsado
+                            {% else %}
+                                {{ booking.payment_status }}
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="reserva-dates">
+                    <div class="dates-grid">
+                        <div class="date-item">
+                            <div class="date-label">Check-in</div>
+                            <div class="date-value">{{ booking.checkin_date }}</div>
+                        </div>
+                        <div class="date-item">
+                            <div class="date-label">Check-out</div>
+                            <div class="date-value">{{ booking.checkout_date }}</div>
+                        </div>
+                        <div class="date-item">
+                            <div class="date-label">Reservado em</div>
+                            <div class="date-value">{{ booking.created_at[:10] if booking.created_at else '' }}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if booking.user_listings.url %}
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <a href="/anuncios/{{ booking.user_listings.id }}" class="btn-primary" style="font-size: 0.9rem; padding: 0.5rem 1rem;">
+                        Ver Anúncio
+                    </a>
+                    <a href="{{ booking.user_listings.url }}" target="_blank" class="btn-primary" style="font-size: 0.9rem; padding: 0.5rem 1rem; background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                        Ver Anúncio Original
+                    </a>
+                    {% if booking.status in ['pending', 'confirmed'] %}
+                    <button onclick="cancelReservation({{ booking.id }}, '{{ booking.user_listings.title }}')" class="btn-cancel" style="font-size: 0.9rem; padding: 0.5rem 1rem; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; border: none; border-radius: 6px; text-decoration: none; display: inline-block; cursor: pointer;">
+                        Cancelar Reserva
+                    </button>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-reservas">
+                <h3>Nenhuma reserva encontrada</h3>
+                <p>Você ainda não fez nenhuma reserva. Que tal explorar os anúncios disponíveis?</p>
+                <a href="{{ url_for('anuncios_publicos') }}" class="btn-primary">
+                    Explorar Anúncios
+                </a>
+            </div>
+        {% endif %}
+    </div>
+    
+    <!-- Scripts do Bootstrap -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        function cancelReservation(bookingId, listingTitle) {
+            if (confirm(`Tem certeza que deseja cancelar a reserva para "${listingTitle}"?\n\nEsta ação não pode ser desfeita.`)) {
+                // Fazer requisição para cancelar a reserva
+                fetch(`/api/cancel-booking/${bookingId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Reserva cancelada com sucesso!');
+                        location.reload(); // Recarregar a página para atualizar a lista
+                    } else {
+                        alert('Erro ao cancelar reserva: ' + (data.error || 'Erro desconhecido'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao cancelar reserva. Tente novamente.');
+                });
+            }
+        }
+    </script>
+</body>
+</html>

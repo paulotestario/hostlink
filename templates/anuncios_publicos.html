@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anúncios Disponíveis - HostLink</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .listing-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            transition: box-shadow 0.3s;
+        }
+        .listing-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .listing-image {
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px 8px 0 0;
+        }
+        .price-badge {
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+        .calendar-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .btn-reserve {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-reserve:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-home"></i> HostLink
+            </a>
+            <div class="navbar-nav ms-auto">
+                {% if user_logged_in %}
+                    <a class="nav-link" href="{{ url_for('index') }}">Dashboard</a>
+                    <a class="nav-link" href="{{ url_for('minhas_reservas') }}">Minhas Reservas</a>
+                    <a class="nav-link" href="{{ url_for('perfil') }}">Perfil</a>
+                    <a class="nav-link" href="{{ url_for('logout') }}">Sair</a>
+                {% else %}
+                    <a class="nav-link" href="/login">Login</a>
+                    <a class="nav-link" href="/register">Cadastrar</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">
+            <i class="fas fa-search"></i> Anúncios Disponíveis
+        </h1>
+
+        <!-- Filtro por Data -->
+        <div class="calendar-container">
+            <h4><i class="fas fa-calendar-alt"></i> Filtrar por Período</h4>
+            <div class="row">
+                <div class="col-md-3">
+                    <label for="filter-date-start" class="form-label">Data de Entrada:</label>
+                    <input type="date" id="filter-date-start" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label for="filter-date-end" class="form-label">Data de Saída:</label>
+                    <input type="date" id="filter-date-end" class="form-control">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button id="filter-btn" class="btn btn-primary me-2">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+                    <button id="clear-filter-btn" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Limpar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Anúncios -->
+        <div id="listings-container" class="row">
+            <!-- Os anúncios serão carregados aqui via JavaScript -->
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="text-center" style="display: none;">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+
+        <!-- Mensagem quando não há anúncios -->
+        <div id="no-listings" class="text-center" style="display: none;">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> Nenhum anúncio encontrado para a data selecionada.
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Reserva -->
+    <div class="modal fade" id="reserveModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Fazer Reserva</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="reserve-form">
+                        <input type="hidden" id="listing-id">
+                        <div class="mb-3">
+                            <label for="guest-name" class="form-label">Nome Completo</label>
+                            <input type="text" class="form-control" id="guest-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="guest-email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="guest-email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="guest-phone" class="form-label">Telefone</label>
+                            <input type="tel" class="form-control" id="guest-phone" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="check-in" class="form-label">Check-in</label>
+                                <input type="date" class="form-control" id="check-in" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="check-out" class="form-label">Check-out</label>
+                                <input type="date" class="form-control" id="check-out" required>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <label for="guests-count" class="form-label">Número de Hóspedes</label>
+                            <input type="number" class="form-control" id="guests-count" min="1" value="1" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="confirm-reserve">Confirmar Reserva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentListings = [];
+        let filteredDate = null;
+
+        // Carregar anúncios ao inicializar a página
+        document.addEventListener('DOMContentLoaded', function() {
+            loadListings();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('filter-btn').addEventListener('click', filterByDate);
+            document.getElementById('clear-filter-btn').addEventListener('click', clearFilter);
+            document.getElementById('confirm-reserve').addEventListener('click', confirmReservation);
+        }
+
+        async function loadListings() {
+            showLoading(true);
+            try {
+                const response = await fetch('/api/anuncios/todos');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentListings = data.listings;
+                    displayListings(currentListings);
+                } else {
+                    showError('Erro ao carregar anúncios: ' + data.message);
+                }
+            } catch (error) {
+                showError('Erro ao carregar anúncios: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function filterByDate() {
+            const startDateInput = document.getElementById('filter-date-start');
+            const endDateInput = document.getElementById('filter-date-end');
+            const startDate = startDateInput.value;
+            const endDate = endDateInput.value;
+            
+            if (!startDate || !endDate) {
+                alert('Por favor, selecione as datas de entrada e saída.');
+                return;
+            }
+
+            if (new Date(startDate) >= new Date(endDate)) {
+                alert('A data de saída deve ser posterior à data de entrada.');
+                return;
+            }
+
+            filteredDate = { start: startDate, end: endDate };
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`/api/anuncios/periodo?data_inicio=${startDate}&data_fim=${endDate}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayListings(data.listings);
+                } else {
+                    showError('Erro ao filtrar anúncios: ' + data.message);
+                }
+            } catch (error) {
+                showError('Erro ao filtrar anúncios: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function clearFilter() {
+            document.getElementById('filter-date-start').value = '';
+            document.getElementById('filter-date-end').value = '';
+            filteredDate = null;
+            displayListings(currentListings);
+        }
+
+        function displayListings(listings) {
+            const container = document.getElementById('listings-container');
+            const noListings = document.getElementById('no-listings');
+            
+            if (listings.length === 0) {
+                container.innerHTML = '';
+                noListings.style.display = 'block';
+                return;
+            }
+            
+            noListings.style.display = 'none';
+            
+            container.innerHTML = listings.map(listing => {
+                let availabilityInfo = '';
+                let buttonClass = 'btn-reserve';
+                let buttonText = '<i class="fas fa-calendar-check"></i> Reservar';
+                let buttonDisabled = '';
+                
+                // Verificar se há reservas pendentes
+                let pendingInfo = '';
+                if (listing.has_pending_bookings && listing.pending_periods && listing.pending_periods.length > 0) {
+                    const pendingPeriods = listing.pending_periods.map(period => {
+                        const startDate = new Date(period.start).toLocaleDateString('pt-BR');
+                        const endDate = new Date(period.end).toLocaleDateString('pt-BR');
+                        return `${startDate} - ${endDate}`;
+                    }).join(', ');
+                    
+                    pendingInfo = `
+                        <div class="mt-2">
+                            <small class="text-warning">
+                                <i class="fas fa-clock"></i> Períodos com reserva pendente: ${pendingPeriods}
+                            </small>
+                        </div>`;
+                }
+                
+                // Verificar se há reservas pendentes - desabilitar botão se houver
+                if (listing.has_pending_bookings && listing.pending_periods && listing.pending_periods.length > 0) {
+                    buttonClass = 'btn btn-outline-warning';
+                    buttonText = '<i class="fas fa-clock"></i> Reserva Pendente';
+                    buttonDisabled = 'disabled';
+                } else if (listing.available === false && listing.next_available_date) {
+                    let availabilityText = `Próxima disponibilidade: ${new Date(listing.next_available_date).toLocaleDateString('pt-BR')}`;
+                    
+                    // Se há período disponível, mostrar o intervalo
+                    if (listing.available_period && listing.available_period.start_date && listing.available_period.end_date) {
+                        const startDate = new Date(listing.available_period.start_date).toLocaleDateString('pt-BR');
+                        const endDate = new Date(listing.available_period.end_date).toLocaleDateString('pt-BR');
+                        
+                        if (listing.available_period.start_date === listing.available_period.end_date) {
+                            availabilityText = `Disponível em: ${startDate}`;
+                        } else {
+                            availabilityText = `Disponível de ${startDate} até ${endDate}`;
+                        }
+                    }
+                    
+                    availabilityInfo = `
+                        <div class="mt-2">
+                            <small class="text-warning">
+                                <i class="fas fa-exclamation-triangle"></i> Não disponível no período selecionado
+                            </small><br>
+                            <small class="text-info">
+                                <i class="fas fa-calendar-alt"></i> ${availabilityText}
+                            </small>
+                        </div>`;
+                    buttonClass = 'btn btn-outline-secondary';
+                    buttonText = '<i class="fas fa-calendar-times"></i> Indisponível';
+                    buttonDisabled = 'disabled';
+                } else if (listing.available === true) {
+                    let availabilityText = 'Disponível no período selecionado';
+                    
+                    // Se há período disponível, mostrar o intervalo mesmo quando disponível
+                    if (listing.available_period && listing.available_period.start_date && listing.available_period.end_date) {
+                        const startDate = new Date(listing.available_period.start_date).toLocaleDateString('pt-BR');
+                        const endDate = new Date(listing.available_period.end_date).toLocaleDateString('pt-BR');
+                        
+                        if (listing.available_period.start_date === listing.available_period.end_date) {
+                            availabilityText = `Disponível em: ${startDate}`;
+                        } else {
+                            availabilityText = `Disponível de ${startDate} até ${endDate}`;
+                        }
+                    }
+                    
+                    availabilityInfo = `
+                        <div class="mt-2">
+                            <small class="text-success">
+                                <i class="fas fa-check-circle"></i> ${availabilityText}
+                            </small>
+                        </div>`;
+                }
+                
+                return `
+                <div class="col-md-6 col-lg-4">
+                    <div class="listing-card">
+                        <img src="${listing.image_url || '/static/images/default-listing.jpg'}" 
+                             class="card-img-top listing-image" 
+                             alt="${listing.title}">
+                        <div class="card-body">
+                            <h5 class="card-title">${listing.title}</h5>
+                            <p class="card-text text-muted">
+                                <i class="fas fa-map-marker-alt"></i> ${listing.location}
+                            </p>
+                            <p class="card-text">${listing.description}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="price-badge">
+                                    R$ ${listing.price_per_night}/noite
+                                </span>
+                                <button class="${buttonClass}" onclick="openReserveModal(${listing.id}, '${listing.title}')" ${buttonDisabled}>
+                                    ${buttonText}
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <i class="fas fa-users"></i> Até ${listing.max_guests} hóspedes
+                                </small>
+                            </div>
+                            ${pendingInfo}
+                            ${availabilityInfo}
+                        </div>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function openReserveModal(listingId, listingTitle) {
+            // Verificar se o usuário está logado
+            {% if user_logged_in %}
+                // Usuário logado - confirmar reserva diretamente
+                confirmAuthenticatedReservation(listingId, listingTitle);
+            {% else %}
+                // Usuário não logado - abrir modal
+                document.getElementById('listing-id').value = listingId;
+                document.querySelector('#reserveModal .modal-title').textContent = `Reservar: ${listingTitle}`;
+                
+                // Se há um período filtrado, pré-preencher as datas
+                if (filteredDate && filteredDate.start && filteredDate.end) {
+                    document.getElementById('check-in').value = filteredDate.start;
+                    document.getElementById('check-out').value = filteredDate.end;
+                }
+                
+                const modal = new bootstrap.Modal(document.getElementById('reserveModal'));
+                modal.show();
+            {% endif %}
+        }
+
+        async function confirmReservation() {
+            const form = document.getElementById('reserve-form');
+            const formData = new FormData(form);
+            
+            const reservationData = {
+                listing_id: document.getElementById('listing-id').value,
+                guest_name: document.getElementById('guest-name').value,
+                guest_email: document.getElementById('guest-email').value,
+                guest_phone: document.getElementById('guest-phone').value,
+                check_in: document.getElementById('check-in').value,
+                check_out: document.getElementById('check-out').value,
+                guests_count: document.getElementById('guests-count').value
+            };
+            
+            // Validação básica
+            if (!reservationData.guest_name || !reservationData.guest_email || 
+                !reservationData.check_in || !reservationData.check_out) {
+                alert('Por favor, preencha todos os campos obrigatórios.');
+                return;
+            }
+            
+            if (new Date(reservationData.check_in) >= new Date(reservationData.check_out)) {
+                alert('A data de check-out deve ser posterior à data de check-in.');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/anuncios/reservar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(reservationData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Reserva realizada com sucesso!');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('reserveModal'));
+                    modal.hide();
+                    form.reset();
+                } else {
+                    alert('Erro ao fazer reserva: ' + data.message);
+                }
+            } catch (error) {
+                alert('Erro ao fazer reserva: ' + error.message);
+            }
+        }
+
+        function confirmAuthenticatedReservation(listingId, listingTitle) {
+            // Verificar se há datas filtradas
+            if (!filteredDate || !filteredDate.start || !filteredDate.end) {
+                alert('Por favor, selecione um período de datas antes de reservar.');
+                return;
+            }
+            
+            // Confirmar com o usuário
+            const startDate = new Date(filteredDate.start).toLocaleDateString('pt-BR');
+            const endDate = new Date(filteredDate.end).toLocaleDateString('pt-BR');
+            const confirmMessage = `Confirmar reserva de "${listingTitle}" de ${startDate} até ${endDate}?`;
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            // Preparar dados para envio
+            const reservationData = {
+                listing_id: listingId,
+                start_date: filteredDate.start,
+                end_date: filteredDate.end,
+                guests_count: 1
+            };
+            
+            // Enviar reserva autenticada
+            fetch('/api/anuncios/reservar-autenticado', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(reservationData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Reserva confirmada com sucesso!');
+                    // Recarregar anúncios para atualizar disponibilidade
+                    loadListings();
+                } else {
+                    alert('Erro ao confirmar reserva: ' + (data.error || 'Erro desconhecido'));
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao processar reserva. Tente novamente.');
+            });
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            alert(message);
+        }
+    </script>
+</body>
+</html>

@@ -71,6 +71,78 @@
                 <a class="nav-link active" href="/similaridade">
                     <i class="fas fa-search me-2"></i>Análise de Similaridade
                 </a>
+                <a class="nav-link" href="/hosting">
+                    <i class="fas fa-home me-2"></i>Hospedar
+                </a>
+                
+                <!-- Informações do usuário -->
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                        {% if current_user.profile_pic %}
+                            <img src="{{ current_user.profile_pic }}" alt="{{ current_user.name }}" class="rounded-circle me-2" width="32" height="32">
+                        {% else %}
+                            <i class="fas fa-user-circle me-2" style="font-size: 1.5rem;"></i>
+                        {% endif %}
+                        {{ current_user.name }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        
+                        <!-- Seção Principal -->
+                        <li><a class="dropdown-item" href="{{ url_for('favoritos') }}">
+                            <i class="fas fa-heart me-2"></i>Favoritos
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('anuncios_publicos') }}">
+                            <i class="fas fa-suitcase me-2"></i>Viagens
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}">
+                            <i class="fas fa-calendar-check me-2"></i>Minhas Reservas
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-comments me-2"></i>Mensagens
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('perfil') }}">
+                            <i class="fas fa-user me-2"></i>Perfil
+                        </a></li>
+                        
+                        <li><hr class="dropdown-divider"></li>
+                        
+                        <!-- Seção Configurações -->
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-bell me-2"></i>Notificações
+                            <span class="badge bg-danger ms-2">1</span>
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-cog me-2"></i>Configurações da conta
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-question-circle me-2"></i>Central de Ajuda
+                        </a></li>
+                        
+                        <li><hr class="dropdown-divider"></li>
+                        
+                        <!-- Seção HostLink -->
+                        <li><a class="dropdown-item" href="/agenda">
+                            <i class="fas fa-calendar-alt me-2"></i>Agenda de Preços
+                        </a></li>
+                        <li><a class="dropdown-item" href="/analise">
+                            <i class="fas fa-chart-line me-2"></i>Análise Detalhada
+                        </a></li>
+                        <li><a class="dropdown-item" href="/similaridade">
+                            <i class="fas fa-search me-2"></i>Análise de Similaridade
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-exclamation-circle me-2 text-danger"></i>Monitoramento Inativo
+                        </a></li>
+                        
+                        <li><hr class="dropdown-divider"></li>
+                        
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt me-2"></i>Sair da conta
+                        </a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>

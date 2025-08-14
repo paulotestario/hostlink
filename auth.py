@@ -22,11 +22,12 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 class User(UserMixin):
     """Classe de usuário para Flask-Login"""
-    def __init__(self, id_, name, email, profile_pic):
+    def __init__(self, id_, name, email, profile_pic, db_id=None):
         self.id = id_
         self.name = name
         self.email = email
         self.profile_pic = profile_pic
+        self.db_id = db_id
 
     @staticmethod
     def get(user_id):
@@ -38,7 +39,8 @@ class User(UserMixin):
                     id_=user_data['id'],
                     name=user_data['name'],
                     email=user_data['email'],
-                    profile_pic=user_data['profile_pic']
+                    profile_pic=user_data['profile_pic'],
+                    db_id=session.get('user_db_id')
                 )
         return None
 
@@ -60,7 +62,7 @@ class User(UserMixin):
             except Exception as e:
                 print(f"❌ Erro ao salvar usuário no banco: {e}")
         
-        user = User(id_, name, email, profile_pic)
+        user = User(id_, name, email, profile_pic, db_id=user_db_id)
         session['user'] = {
             'id': id_,
             'name': name,

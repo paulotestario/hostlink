@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Favoritos - HostLink</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+        
+        .main-container {
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .page-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .page-header h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+        
+        .page-header p {
+            color: #666;
+            margin-bottom: 0;
+        }
+        
+        .favorites-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .favorite-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid #e9ecef;
+        }
+        
+        .favorite-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .favorite-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .favorite-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+        
+        .favorite-location {
+            color: #666;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .favorite-location i {
+            margin-right: 0.5rem;
+            color: #667eea;
+        }
+        
+        .favorite-price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+        
+        .favorite-rating {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .favorite-rating .stars {
+            color: #ffc107;
+            margin-right: 0.5rem;
+        }
+        
+        .favorite-rating .rating-text {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .favorite-badges {
+            margin-bottom: 1rem;
+        }
+        
+        .badge-beachfront {
+            background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+        
+        .favorite-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .btn-view {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: transform 0.2s;
+        }
+        
+        .btn-view:hover {
+            transform: translateY(-2px);
+            color: white;
+            text-decoration: none;
+        }
+        
+        .btn-remove {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-remove:hover {
+            background: #c82333;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            color: #ddd;
+            margin-bottom: 1rem;
+        }
+        
+        .empty-state h3 {
+            color: #999;
+            margin-bottom: 1rem;
+        }
+        
+        .empty-state p {
+            color: #666;
+            margin-bottom: 2rem;
+        }
+        
+        .loading-spinner {
+            text-align: center;
+            padding: 3rem;
+        }
+        
+        .spinner-border {
+            color: #667eea;
+        }
+        
+        @media (max-width: 768px) {
+            .favorite-card {
+                padding: 1rem;
+            }
+            
+            .favorite-actions {
+                flex-direction: column;
+            }
+            
+            .btn-view, .btn-remove {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+                <i class="fas fa-home me-2" style="color: #667eea; font-size: 1.5rem;"></i>
+                <span style="font-weight: bold; color: #333;">HOSTLINK</span>
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">🏠 Início</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('agenda') }}">📅 Agenda de Preços</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('analise') }}">📊 Análise Detalhada</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('similaridade') }}">🔍 Análise de Similaridade</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('hosting') }}">🏡 Hospedar</a>
+                    </li>
+                </ul>
+                
+                {% if current_user.is_authenticated %}
+                <div class="dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
+                        {% if current_user.profile_pic %}
+                            <img src="{{ current_user.profile_pic }}" alt="{{ current_user.name }}" class="rounded-circle me-2" width="32" height="32">
+                        {% else %}
+                            <i class="fas fa-user-circle me-2" style="font-size: 1.5rem;"></i>
+                        {% endif %}
+                        {{ current_user.name }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><div class="dropdown-item-text text-muted small">{{ current_user.email }}</div></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('favoritos') }}">
+                            <i class="fas fa-heart me-2"></i>Favoritos
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-suitcase me-2"></i>Viagens
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}">
+                            <i class="fas fa-calendar-check me-2"></i>Minhas Reservas
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-comments me-2"></i>Mensagens
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('perfil') }}">
+                            <i class="fas fa-user me-2"></i>Perfil
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-bell me-2"></i>Notificações <span class="badge bg-danger ms-2">1</span>
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-cog me-2"></i>Configurações da conta
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-question-circle me-2"></i>Central de Ajuda
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('agenda') }}">
+                            <i class="fas fa-calendar-alt me-2"></i>Agenda de Preços
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('analise') }}">
+                            <i class="fas fa-chart-line me-2"></i>Análise Detalhada
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('similaridade') }}">
+                            <i class="fas fa-search me-2"></i>Análise de Similaridade
+                        </a></li>
+                        <li><a class="dropdown-item text-muted" href="#">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Monitoramento Inativo
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt me-2"></i>Sair da conta
+                        </a></li>
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container main-container" style="margin-top: 100px;">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1>❤️ Meus Favoritos</h1>
+            <p>Anúncios que você salvou para acompanhar</p>
+        </div>
+
+        <!-- Favorites Container -->
+        <div class="favorites-container">
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-spinner">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-3">Carregando seus favoritos...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="fas fa-heart-broken"></i>
+                <h3>Nenhum favorito ainda</h3>
+                <p>Você ainda não salvou nenhum anúncio como favorito.<br>
+                   Explore os anúncios disponíveis e adicione seus preferidos!</p>
+                <a href="{{ url_for('anuncios_publicos') }}" class="btn btn-view">
+                    <i class="fas fa-search me-2"></i>Explorar Anúncios
+                </a>
+            </div>
+
+            <!-- Favorites List -->
+            <div id="favoritesList" style="display: none;">
+                <!-- Favorites will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Carregar favoritos quando a página carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFavorites();
+        });
+
+        async function loadFavorites() {
+            try {
+                const response = await fetch('/api/favorites/list');
+                const data = await response.json();
+
+                document.getElementById('loadingState').style.display = 'none';
+
+                if (data.success && data.data.length > 0) {
+                    displayFavorites(data.data);
+                } else {
+                    document.getElementById('emptyState').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Erro ao carregar favoritos:', error);
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        }
+
+        function displayFavorites(favorites) {
+            const favoritesList = document.getElementById('favoritesList');
+            let html = '';
+
+            favorites.forEach(favorite => {
+                const imageUrl = favorite.image_url || '/static/placeholder.svg';
+                const price = favorite.price_per_night ? `R$ ${favorite.price_per_night}` : 'Preço não informado';
+                const rating = favorite.rating ? favorite.rating.toFixed(1) : null;
+                const reviews = favorite.reviews || 0;
+                const location = favorite.location || 'Localização não informada';
+                const addedDate = new Date(favorite.added_at).toLocaleDateString('pt-BR');
+
+                html += `
+                    <div class="favorite-card" data-listing-id="${favorite.listing_id}">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <img src="${imageUrl}" alt="${favorite.title}" class="favorite-image"
+                                     onerror="this.src='/static/placeholder.svg'; this.onerror=null;">
+                            </div>
+                            <div class="col-md-8">
+                                <h3 class="favorite-title">${favorite.title}</h3>
+                                
+                                <div class="favorite-location">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    ${location}${favorite.state ? `, ${favorite.state}` : ''}
+                                </div>
+                                
+                                <div class="favorite-price">${price}</div>
+                                
+                                ${rating ? `
+                                    <div class="favorite-rating">
+                                        <div class="stars">
+                                            ${generateStars(rating)}
+                                        </div>
+                                        <span class="rating-text">${rating} (${reviews} avaliações)</span>
+                                    </div>
+                                ` : ''}
+                                
+                                <div class="favorite-badges">
+                                    ${favorite.is_beachfront ? '<span class="badge-beachfront"><i class="fas fa-water me-1"></i>Frente à praia</span>' : ''}
+                                    <span class="badge bg-secondary">${favorite.platform}</span>
+                                </div>
+                                
+                                <div class="favorite-actions">
+                                    <a href="/anuncios/${favorite.listing_id}" class="btn-view">
+                                        <i class="fas fa-eye me-1"></i>Ver Anúncio
+                                    </a>
+                                    <button class="btn-remove" onclick="removeFavorite(${favorite.listing_id})">
+                                        <i class="fas fa-trash me-1"></i>Remover
+                                    </button>
+                                </div>
+                                
+                                <small class="text-muted d-block mt-2">
+                                    <i class="fas fa-calendar me-1"></i>Adicionado em ${addedDate}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            favoritesList.innerHTML = html;
+            favoritesList.style.display = 'block';
+        }
+
+        function generateStars(rating) {
+            const fullStars = Math.floor(rating);
+            const hasHalfStar = rating % 1 >= 0.5;
+            let stars = '';
+
+            for (let i = 0; i < fullStars; i++) {
+                stars += '<i class="fas fa-star"></i>';
+            }
+
+            if (hasHalfStar) {
+                stars += '<i class="fas fa-star-half-alt"></i>';
+            }
+
+            const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+            for (let i = 0; i < emptyStars; i++) {
+                stars += '<i class="far fa-star"></i>';
+            }
+
+            return stars;
+        }
+
+        async function removeFavorite(listingId) {
+            if (!confirm('Tem certeza que deseja remover este anúncio dos favoritos?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/favorites/remove', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ listing_id: listingId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Remover o card da interface
+                    const card = document.querySelector(`[data-listing-id="${listingId}"]`);
+                    if (card) {
+                        card.remove();
+                    }
+
+                    // Verificar se ainda há favoritos
+                    const remainingCards = document.querySelectorAll('.favorite-card');
+                    if (remainingCards.length === 0) {
+                        document.getElementById('favoritesList').style.display = 'none';
+                        document.getElementById('emptyState').style.display = 'block';
+                    }
+
+                    // Mostrar mensagem de sucesso
+                    showToast('Anúncio removido dos favoritos!', 'success');
+                } else {
+                    showToast('Erro ao remover favorito: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao remover favorito:', error);
+                showToast('Erro ao remover favorito', 'error');
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            // Criar toast simples
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} position-fixed`;
+            toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            toast.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Remover automaticamente após 3 segundos
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

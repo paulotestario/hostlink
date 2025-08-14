@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ listing.title }} - HostLink</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='hostlink-theme.css') }}" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            z-index: 1050;
+            position: relative;
+        }
+        
+        .listing-hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4rem 0 6rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .listing-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+            opacity: 0.3;
+        }
+        
+        .listing-image {
+            width: 100%;
+            height: 350px;
+            object-fit: cover;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .listing-image:hover {
+            transform: scale(1.02);
+        }
+        
+        .listing-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 25px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            padding: 3rem;
+            margin-top: -120px;
+            position: relative;
+            z-index: 10;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .price-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 30px;
+            font-weight: bold;
+            display: inline-block;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .amenity-tag {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            margin: 0.25rem;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        
+        .amenity-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .btn-reserve {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 30px;
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-reserve::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn-reserve:hover::before {
+            left: 100%;
+        }
+        
+        .btn-reserve:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+        
+        .info-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 15px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+        }
+        
+        .info-item:hover {
+            background: rgba(102, 126, 234, 0.1);
+            transform: translateX(5px);
+        }
+        
+        .info-item i {
+            width: 25px;
+            margin-right: 1rem;
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+        
+        .breadcrumb-item a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .breadcrumb-item a:hover {
+            color: white;
+        }
+        
+        .modal-content {
+            border-radius: 20px;
+            border: none;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px 20px 0 0;
+            border-bottom: none;
+        }
+        
+        .form-control {
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .btn-outline-danger {
+            border-radius: 30px;
+            border-width: 2px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-outline-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
+        }
+        
+        .btn-danger {
+            border-radius: 30px;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            border: none;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(220, 53, 69, 0.4);
+        }
+        
+        .btn-outline-secondary {
+            border-radius: 30px;
+            border-width: 2px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-outline-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(108, 117, 125, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .listing-hero {
+                padding: 2rem 0 4rem 0;
+            }
+            
+            .listing-card {
+                margin-top: -80px;
+                padding: 2rem;
+                border-radius: 20px;
+            }
+            
+            .listing-image {
+                height: 250px;
+                border-radius: 15px;
+            }
+            
+            .price-badge {
+                padding: 0.75rem 1.25rem;
+                border-radius: 25px;
+            }
+            
+            .btn-reserve {
+                padding: 0.75rem 1.5rem;
+                border-radius: 25px;
+            }
+            
+            .info-item {
+                padding: 0.75rem;
+                margin-bottom: 1rem;
+            }
+        }
+        
+        @media (max-width: 576px) {
+             .listing-card {
+                 margin-top: -60px;
+                 padding: 1.5rem;
+             }
+             
+             .listing-image {
+                 height: 200px;
+             }
+             
+             .h2 {
+                 font-size: 1.5rem;
+             }
+         }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
+                <i class="fas fa-home text-primary me-2"></i>HostLink
+            </a>
+            
+            <div class="navbar-nav ms-auto">
+                {% if user_logged_in %}
+                    <div class="dropdown">
+                        <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="{{ user_info.picture or '/static/placeholder.svg' }}" 
+                                 alt="{{ user_info.name }}" 
+                                 class="rounded-circle me-2" 
+                                 style="width: 32px; height: 32px; object-fit: cover;">
+                            {{ user_info.name }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><div class="dropdown-item-text text-muted small">{{ user_info.email }}</div></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('favoritos') }}"><i class="fas fa-heart me-2"></i>Favoritos</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-suitcase me-2"></i>Viagens</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}"><i class="fas fa-calendar-check me-2"></i>Minhas Reservas</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-comments me-2"></i>Mensagens</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('perfil') }}"><i class="fas fa-user me-2"></i>Perfil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-bell me-2"></i>Notificações <span class="badge bg-danger ms-2">1</span></a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Configurações da conta</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-question-circle me-2"></i>Central de Ajuda</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('agenda') }}"><i class="fas fa-calendar-alt me-2"></i>Agenda de Preços</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('analise') }}"><i class="fas fa-chart-line me-2"></i>Análise Detalhada</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('similaridade') }}"><i class="fas fa-search me-2"></i>Análise de Similaridade</a></li>
+                            <li><a class="dropdown-item text-muted" href="#"><i class="fas fa-exclamation-triangle me-2"></i>Monitoramento Inativo</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Sair da conta</a></li>
+                        </ul>
+                    </div>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary me-2">Entrar</a>
+                    <a href="{{ url_for('anuncios_publicos') }}" class="btn btn-primary">Ver Anúncios</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="listing-hero">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb text-white-50">
+                            <li class="breadcrumb-item"><a href="{{ url_for('anuncios_publicos') }}" class="text-white">Anúncios</a></li>
+                            <li class="breadcrumb-item active text-white" aria-current="page">{{ listing.title }}</li>
+                        </ol>
+                    </nav>
+                    <h1 class="h3 fw-bold mb-5">{{ listing.title }}</h1>
+                    {% if listing.municipios %}
+                        <p class="lead mb-0">
+                            <i class="fas fa-map-marker-alt me-2"></i>
+                            {{ listing.municipios.nome }}, {{ listing.municipios.estado }}
+                        </p>
+                    {% endif %}
+                </div>
+                <div class="col-md-4 text-end">
+                    {% if listing.price_per_night %}
+                        <div class="price-badge">
+                            <span class="h4 mb-0">R$ {{ "%.2f"|format(listing.price_per_night) }}</span>
+                            <small class="d-block">por noite</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <div class="container">
+        <div class="listing-card">
+            <div class="row">
+                <!-- Image -->
+                <div class="col-md-6 mb-4">
+                    {% if listing.image_url %}
+                        <img src="{{ listing.image_url }}" alt="{{ listing.title }}" class="listing-image">
+                    {% else %}
+                        <div class="listing-image d-flex align-items-center justify-content-center bg-light">
+                            <i class="fas fa-home fa-3x text-muted"></i>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Details -->
+                <div class="col-md-6">
+                    <h3 class="mb-4">Detalhes da Propriedade</h3>
+                    
+                    <div class="info-item">
+                        <i class="fas fa-home"></i>
+                        <span><strong>Tipo:</strong> {{ listing.property_type or 'Não informado' }}</span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <i class="fas fa-users"></i>
+                        <span><strong>Hóspedes:</strong> {{ listing.max_guests or 'Não informado' }}</span>
+                    </div>
+                    
+                    {% if listing.bedrooms %}
+                        <div class="info-item">
+                            <i class="fas fa-bed"></i>
+                            <span><strong>Quartos:</strong> {{ listing.bedrooms }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    {% if listing.bathrooms %}
+                        <div class="info-item">
+                            <i class="fas fa-bath"></i>
+                            <span><strong>Banheiros:</strong> {{ listing.bathrooms }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    {% if listing.minimum_nights %}
+                        <div class="info-item">
+                            <i class="fas fa-calendar"></i>
+                            <span><strong>Mínimo de noites:</strong> {{ listing.minimum_nights }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="info-item">
+                        <i class="fas fa-globe"></i>
+                        <span><strong>Plataforma:</strong> {{ listing.platform.title() }}</span>
+                    </div>
+                    
+                    {% if listing.users %}
+                        <div class="info-item">
+                            <i class="fas fa-user-tie"></i>
+                            <span><strong>Anfitrião:</strong> {{ listing.users.name }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Action Buttons -->
+                    <div class="mt-4">
+                        <div class="row g-2">
+                            <div class="col-8" id="reservationButtonContainer">
+                                <button id="makeReservationBtn" class="btn btn-reserve btn-lg w-100" onclick="showReservationModal()" style="display: none;">
+                                    <i class="fas fa-calendar-check me-2"></i>Fazer Reserva
+                                </button>
+                                <div id="existingReservationBtns" style="display: none;">
+                                    <button class="btn btn-primary btn-lg w-100 mb-2" onclick="goToReservation()">
+                                        <i class="fas fa-eye me-2"></i>Ir para Reserva
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-lg w-100" onclick="showReservationModal()">
+                                        <i class="fas fa-plus me-2"></i>Fazer Nova Reserva
+                                    </button>
+                                </div>
+                            </div>
+                            {% if user_logged_in %}
+                            <div class="col-4">
+                                <button id="favoriteBtn" class="btn btn-outline-danger btn-lg w-100" onclick="toggleFavorite()" title="Adicionar aos favoritos">
+                                    <i id="favoriteIcon" class="far fa-heart"></i>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Original Listing Link -->
+                    {% if listing.url %}
+                        <div class="mt-3">
+                            <a href="{{ listing.url }}" target="_blank" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-external-link-alt me-2"></i>Ver Anúncio Original
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Description -->
+            {% if listing.description %}
+                <div class="row mt-5">
+                    <div class="col-12">
+                        <h3 class="mb-3">Descrição</h3>
+                        <p class="text-muted">{{ listing.description }}</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Reservation Modal -->
+    <div class="modal fade" id="reservationModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Fazer Reserva</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="reservationForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Check-in</label>
+                                <input type="date" class="form-control" id="checkinDate" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Check-out</label>
+                                <input type="date" class="form-control" id="checkoutDate" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Nome Completo</label>
+                            <input type="text" class="form-control" id="guestName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="guestEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Telefone (opcional)</label>
+                            <input type="tel" class="form-control" id="guestPhone">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="submitReservation()">Confirmar Reserva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let isFavorite = false;
+        const listingId = {{ listing.id }};
+        
+        function showReservationModal() {
+            const modal = new bootstrap.Modal(document.getElementById('reservationModal'));
+            modal.show();
+        }
+        
+        async function checkFavoriteStatus() {
+            {% if user_logged_in %}
+            try {
+                const response = await fetch('/api/favorites/check', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ listing_id: listingId })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    isFavorite = data.is_favorite;
+                    updateFavoriteButton();
+                }
+            } catch (error) {
+                console.error('Erro ao verificar status de favorito:', error);
+            }
+            {% endif %}
+        }
+        
+        function updateFavoriteButton() {
+            const btn = document.getElementById('favoriteBtn');
+            const icon = document.getElementById('favoriteIcon');
+            
+            if (isFavorite) {
+                btn.className = 'btn btn-danger btn-lg w-100';
+                btn.title = 'Remover dos favoritos';
+                icon.className = 'fas fa-heart';
+            } else {
+                btn.className = 'btn btn-outline-danger btn-lg w-100';
+                btn.title = 'Adicionar aos favoritos';
+                icon.className = 'far fa-heart';
+            }
+        }
+        
+        async function toggleFavorite() {
+            {% if user_logged_in %}
+            try {
+                const endpoint = isFavorite ? '/api/favorites/remove' : '/api/favorites/add';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ listing_id: listingId })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    isFavorite = !isFavorite;
+                    updateFavoriteButton();
+                    
+                    // Mostrar mensagem de sucesso
+                    showToast(data.message, 'success');
+                } else {
+                    showToast('Erro: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao alterar favorito:', error);
+                showToast('Erro ao processar solicitação', 'error');
+            }
+            {% else %}
+            alert('Você precisa estar logado para adicionar favoritos.');
+            {% endif %}
+        }
+        
+        let userReservation = null;
+        
+        async function checkReservationStatus() {
+            {% if user_logged_in %}
+            try {
+                const response = await fetch(`/api/anuncios/check-reservation/${listingId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    userReservation = data.reservation;
+                    updateReservationButtons(data.has_reservation);
+                }
+            } catch (error) {
+                console.error('Erro ao verificar status de reserva:', error);
+                updateReservationButtons(false);
+            }
+            {% else %}
+            updateReservationButtons(false);
+            {% endif %}
+        }
+        
+        function updateReservationButtons(hasReservation) {
+            const makeReservationBtn = document.getElementById('makeReservationBtn');
+            const existingReservationBtns = document.getElementById('existingReservationBtns');
+            
+            if (hasReservation) {
+                makeReservationBtn.style.display = 'none';
+                existingReservationBtns.style.display = 'block';
+            } else {
+                makeReservationBtn.style.display = 'block';
+                existingReservationBtns.style.display = 'none';
+            }
+        }
+        
+        function goToReservation() {
+            if (userReservation) {
+                window.location.href = '/minhas_reservas';
+            }
+        }
+        
+        function showToast(message, type = 'info') {
+            // Criar toast simples
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} position-fixed`;
+            toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            toast.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Remover automaticamente após 3 segundos
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 3000);
+        }
+        
+        function submitReservation() {
+            const form = document.getElementById('reservationForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            const data = {
+                listing_id: {{ listing.id }},
+                start_date: document.getElementById('checkinDate').value,
+                end_date: document.getElementById('checkoutDate').value,
+                guest_name: document.getElementById('guestName').value,
+                guest_email: document.getElementById('guestEmail').value,
+                guest_phone: document.getElementById('guestPhone').value
+            };
+            
+            fetch('/api/anuncios/reservar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert('Reserva realizada com sucesso! Você receberá uma confirmação por email.');
+                    bootstrap.Modal.getInstance(document.getElementById('reservationModal')).hide();
+                } else {
+                    alert('Erro ao fazer reserva: ' + result.error);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao processar reserva. Tente novamente.');
+            });
+        }
+        
+        // Set minimum date to today
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('checkinDate').min = today;
+            document.getElementById('checkoutDate').min = today;
+            
+            // Update checkout min date when checkin changes
+            document.getElementById('checkinDate').addEventListener('change', function() {
+                const checkinDate = new Date(this.value);
+                checkinDate.setDate(checkinDate.getDate() + 1);
+                document.getElementById('checkoutDate').min = checkinDate.toISOString().split('T')[0];
+            });
+            
+            // Verificar status de favorito e reserva quando a página carregar
+            checkFavoriteStatus();
+            checkReservationStatus();
+            
+            // Inicializar dropdowns do Bootstrap
+            var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
+            var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
+                return new bootstrap.Dropdown(dropdownToggleEl);
+            });
+        });
+    </script>
+</body>
+</html>

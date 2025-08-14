@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospedagem - HostLink</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='hostlink-theme.css') }}" rel="stylesheet">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
+                <i class="fas fa-home me-2"></i>HostLink
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('index') }}">
+                        <i class="fas fa-home me-2"></i>Início
+                    </a>
+                    <a class="nav-link" href="{{ url_for('agenda') }}">
+                        <i class="fas fa-calendar-alt me-2"></i>Agenda de Preços
+                    </a>
+                    <a class="nav-link" href="{{ url_for('analise') }}">
+                        <i class="fas fa-chart-line me-2"></i>Análise Detalhada
+                    </a>
+                    <a class="nav-link" href="{{ url_for('similaridade') }}">
+                        <i class="fas fa-search me-2"></i>Análise de Similaridade
+                    </a>
+                    
+                    <!-- Informações do usuário -->
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            {% if current_user.profile_pic %}
+                                <img src="{{ current_user.profile_pic }}" alt="{{ current_user.name }}" class="rounded-circle me-2" width="32" height="32">
+                            {% else %}
+                                <i class="fas fa-user-circle me-2" style="font-size: 1.5rem;"></i>
+                            {% endif %}
+                            {{ current_user.name }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Seção Principal -->
+                            <li><a class="dropdown-item" href="{{ url_for('favoritos') }}">
+                                <i class="fas fa-heart me-2"></i>Favoritos
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('anuncios_publicos') }}">
+                                <i class="fas fa-suitcase me-2"></i>Viagens
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}">
+                                <i class="fas fa-calendar-check me-2"></i>Minhas Reservas
+                            </a></li>
+                            <li><a class="dropdown-item" href="#">
+                                <i class="fas fa-comments me-2"></i>Mensagens
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('perfil') }}">
+                                <i class="fas fa-user me-2"></i>Perfil
+                            </a></li>
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Seção Configurações -->
+                            <li><a class="dropdown-item" href="#">
+                                <i class="fas fa-bell me-2"></i>Notificações
+                                <span class="badge bg-danger ms-2">1</span>
+                            </a></li>
+                            <li><a class="dropdown-item" href="#">
+                                <i class="fas fa-cog me-2"></i>Configurações da conta
+                            </a></li>
+                            <li><a class="dropdown-item" href="#">
+                                <i class="fas fa-question-circle me-2"></i>Central de Ajuda
+                            </a></li>
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Seção HostLink -->
+                            <li><a class="dropdown-item" href="{{ url_for('agenda') }}">
+                                <i class="fas fa-calendar-alt me-2"></i>Agenda de Preços
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('analise') }}">
+                                <i class="fas fa-chart-line me-2"></i>Análise Detalhada
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('similaridade') }}">
+                                <i class="fas fa-search me-2"></i>Análise de Similaridade
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('hosting') }}">
+                                <i class="fas fa-home me-2"></i>Hospedar
+                            </a></li>
+                            <li><a class="dropdown-item" href="#">
+                                <i class="fas fa-exclamation-circle me-2 text-danger"></i>Monitoramento Inativo
+                            </a></li>
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Sair da conta
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Conteúdo Principal -->
+    <div class="container mt-4">
+        <!-- Cabeçalho -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h2 mb-1">
+                            <i class="fas fa-home text-primary me-2"></i>Hospedagem
+                        </h1>
+                        <p class="text-muted mb-0">Gerencie seus anúncios e propriedades</p>
+                    </div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newListingModal">
+                        <i class="fas fa-plus me-2"></i>Novo Anúncio
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertas -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Lista de Anúncios -->
+        <div class="row">
+            {% if user_listings %}
+                {% for listing in user_listings %}
+                <div class="col-lg-6 col-xl-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <!-- Imagem do anúncio -->
+                        <div class="position-relative">
+                            {% if listing.image_url %}
+                                <img src="{{ listing.image_url }}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="{{ listing.title }}">
+                            {% else %}
+                                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                    <i class="fas fa-home fa-3x text-muted"></i>
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Status badge -->
+                            <span class="position-absolute top-0 end-0 m-2 badge {{ 'bg-success' if listing.is_active else 'bg-secondary' }}">
+                                {{ 'Ativo' if listing.is_active else 'Inativo' }}
+                            </span>
+                        </div>
+                        
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">{{ listing.title }}</h5>
+                            
+                            <!-- Detalhes do imóvel -->
+                            <div class="mb-3">
+                                {% if listing.property_type %}
+                                    <span class="badge bg-light text-dark me-2">
+                                        <i class="fas fa-building me-1"></i>{{ listing.property_type }}
+                                    </span>
+                                {% endif %}
+                                {% if listing.max_guests %}
+                                    <span class="badge bg-light text-dark me-2">
+                                        <i class="fas fa-users me-1"></i>{{ listing.max_guests }} hóspedes
+                                    </span>
+                                {% endif %}
+                                {% if listing.bedrooms %}
+                                    <span class="badge bg-light text-dark me-2">
+                                        <i class="fas fa-bed me-1"></i>{{ listing.bedrooms }} quartos
+                                    </span>
+                                {% endif %}
+                                {% if listing.bathrooms %}
+                                    <span class="badge bg-light text-dark">
+                                        <i class="fas fa-bath me-1"></i>{{ listing.bathrooms }} banheiros
+                                    </span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Preço -->
+                            {% if listing.price_per_night %}
+                                <div class="mb-3">
+                                    <h6 class="text-primary mb-0">
+                                        <i class="fas fa-dollar-sign me-1"></i>R$ {{ "%.2f"|format(listing.price_per_night) }}/noite
+                                    </h6>
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Localização -->
+                            {% if listing.municipios %}
+                                <p class="text-muted small mb-3">
+                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                    {{ listing.municipios.nome }}, {{ listing.municipios.estado }}
+                                </p>
+                            {% endif %}
+                            
+                            <!-- Botões de ação -->
+                            <div class="mt-auto">
+                                <div class="btn-group w-100" role="group">
+                                    <button class="btn btn-outline-primary btn-sm" onclick="editListing({{ listing.id }})">
+                                        <i class="fas fa-edit me-1"></i>Editar
+                                    </button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="openAgenda({{ listing.id }})">
+                                        <i class="fas fa-calendar-alt me-1"></i>Agendas
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="viewListing('{{ listing.url }}')">
+                                        <i class="fas fa-external-link-alt me-1"></i>Ver
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" onclick="deleteListing({{ listing.id }})">
+                                        <i class="fas fa-trash me-1"></i>Excluir
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <!-- Estado vazio -->
+                <div class="col-12">
+                    <div class="text-center py-5">
+                        <i class="fas fa-home fa-4x text-muted mb-3"></i>
+                        <h4 class="text-muted">Nenhum anúncio cadastrado</h4>
+                        <p class="text-muted mb-4">Comece criando seu primeiro anúncio para hospedar hóspedes</p>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newListingModal">
+                            <i class="fas fa-plus me-2"></i>Criar Primeiro Anúncio
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modal Novo Anúncio -->
+    <div class="modal fade" id="newListingModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus me-2"></i>Novo Anúncio
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="newListingForm">
+                        <!-- Título -->
+                        <div class="mb-3">
+                            <label for="listingTitle" class="form-label">Título do Anúncio *</label>
+                            <input type="text" class="form-control" id="listingTitle" required>
+                            <div class="form-text">Ex: Apartamento aconchegante em Copacabana</div>
+                        </div>
+                        
+                        <!-- URL (opcional) -->
+                        <div class="mb-3">
+                            <label for="listingUrl" class="form-label">URL do Anúncio</label>
+                            <input type="url" class="form-control" id="listingUrl">
+                            <div class="form-text">Link do seu anúncio no Airbnb (opcional)</div>
+                        </div>
+                        
+                        <!-- Detalhes do Imóvel -->
+                        <h6 class="mb-3">Detalhes do Imóvel</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="propertyType" class="form-label">Tipo de Propriedade</label>
+                                <select class="form-select" id="propertyType">
+                                    <option value="">Selecione...</option>
+                                    <option value="Apartamento">Apartamento</option>
+                                    <option value="Casa">Casa</option>
+                                    <option value="Loft">Loft</option>
+                                    <option value="Studio">Studio</option>
+                                    <option value="Quarto">Quarto</option>
+                                    <option value="Casa de hóspedes">Casa de hóspedes</option>
+                                    <option value="Outro">Outro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="maxGuests" class="form-label">Máximo de Hóspedes</label>
+                                <input type="number" class="form-control" id="maxGuests" min="1" max="20">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="bedrooms" class="form-label">Quartos</label>
+                                <input type="number" class="form-control" id="bedrooms" min="0" max="10">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="bathrooms" class="form-label">Banheiros</label>
+                                <input type="number" class="form-control" id="bathrooms" min="1" max="10">
+                            </div>
+                        </div>
+                        
+                        <!-- Preço e Disponibilidade -->
+                        <h6 class="mb-3">Preço e Disponibilidade</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="pricePerNight" class="form-label">Preço por Noite (R$)</label>
+                                <input type="number" class="form-control" id="pricePerNight" step="0.01" min="0">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="minimumNights" class="form-label">Mínimo de Noites</label>
+                                <input type="number" class="form-control" id="minimumNights" min="1" value="1">
+                            </div>
+                        </div>
+                        
+                        <!-- Descrição -->
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Descrição</label>
+                            <textarea class="form-control" id="description" rows="4" placeholder="Descreva seu espaço, comodidades e o que torna especial..."></textarea>
+                        </div>
+                        
+                        <!-- Upload de Fotos -->
+                        <h6 class="mb-3">Fotos</h6>
+                        <div class="mb-3">
+                            <label for="listingImages" class="form-label">Adicionar Fotos</label>
+                            <input type="file" class="form-control" id="listingImages" multiple accept="image/*">
+                            <div class="form-text">Selecione até 10 fotos do seu espaço</div>
+                        </div>
+                        
+                        <!-- Preview das imagens -->
+                        <div id="imagePreview" class="row g-2 mb-3" style="display: none;"></div>
+                        
+                        <!-- Localização -->
+                        <h6 class="mb-3">Localização</h6>
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Endereço</label>
+                            <input type="text" class="form-control" id="address" placeholder="Rua, número, bairro...">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="saveListingBtn">
+                        <i class="fas fa-save me-2"></i>Salvar Anúncio
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Anúncio -->
+    <div class="modal fade" id="editListingModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-edit me-2"></i>Editar Anúncio
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editListingForm">
+                        <input type="hidden" id="editListingId">
+                        <!-- Mesmo formulário do novo anúncio, mas com IDs diferentes -->
+                        <!-- Título -->
+                        <div class="mb-3">
+                            <label for="editListingTitle" class="form-label">Título do Anúncio *</label>
+                            <input type="text" class="form-control" id="editListingTitle" required>
+                        </div>
+                        
+                        <!-- URL -->
+                        <div class="mb-3">
+                            <label for="editListingUrl" class="form-label">URL do Anúncio</label>
+                            <input type="url" class="form-control" id="editListingUrl">
+                        </div>
+                        
+                        <!-- Detalhes do Imóvel -->
+                        <h6 class="mb-3">Detalhes do Imóvel</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editPropertyType" class="form-label">Tipo de Propriedade</label>
+                                <select class="form-select" id="editPropertyType">
+                                    <option value="">Selecione...</option>
+                                    <option value="Apartamento">Apartamento</option>
+                                    <option value="Casa">Casa</option>
+                                    <option value="Loft">Loft</option>
+                                    <option value="Studio">Studio</option>
+                                    <option value="Quarto">Quarto</option>
+                                    <option value="Casa de hóspedes">Casa de hóspedes</option>
+                                    <option value="Outro">Outro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editMaxGuests" class="form-label">Máximo de Hóspedes</label>
+                                <input type="number" class="form-control" id="editMaxGuests" min="1" max="20">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editBedrooms" class="form-label">Quartos</label>
+                                <input type="number" class="form-control" id="editBedrooms" min="0" max="10">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editBathrooms" class="form-label">Banheiros</label>
+                                <input type="number" class="form-control" id="editBathrooms" min="1" max="10">
+                            </div>
+                        </div>
+                        
+                        <!-- Preço -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editPricePerNight" class="form-label">Preço por Noite (R$)</label>
+                                <input type="number" class="form-control" id="editPricePerNight" step="0.01" min="0">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editMinimumNights" class="form-label">Mínimo de Noites</label>
+                                <input type="number" class="form-control" id="editMinimumNights" min="1">
+                            </div>
+                        </div>
+                        
+                        <!-- Descrição -->
+                        <div class="mb-3">
+                            <label for="editDescription" class="form-label">Descrição</label>
+                            <textarea class="form-control" id="editDescription" rows="4"></textarea>
+                        </div>
+                        
+                        <!-- Fotos Existentes -->
+                        <div class="mb-3">
+                            <label class="form-label">Fotos Atuais</label>
+                            <div id="existingImages" class="row g-2 mb-3" style="display: none;"></div>
+                        </div>
+                        
+                        <!-- Upload de Fotos -->
+                        <div class="mb-3">
+                            <label for="editListingImages" class="form-label">Adicionar Novas Fotos</label>
+                            <input type="file" class="form-control" id="editListingImages" multiple accept="image/*">
+                            <div class="form-text">Selecione até 10 fotos do seu espaço</div>
+                        </div>
+                        
+                        <!-- Preview das novas imagens -->
+                        <div id="editImagePreview" class="row g-2 mb-3" style="display: none;"></div>
+                        
+                        <!-- Endereço -->
+                        <div class="mb-3">
+                            <label for="editAddress" class="form-label">Endereço</label>
+                            <input type="text" class="form-control" id="editAddress">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="updateListing()">
+                        <i class="fas fa-save me-2"></i>Salvar Alterações
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        console.log('JavaScript loaded successfully');
+        // Preview de imagens
+        document.getElementById('listingImages').addEventListener('change', function(e) {
+            const files = e.target.files;
+            const preview = document.getElementById('imagePreview');
+            preview.innerHTML = '';
+            
+            if (files.length > 0) {
+                preview.style.display = 'block';
+                
+                for (let i = 0; i < Math.min(files.length, 10); i++) {
+                    const file = files[i];
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-3 col-sm-4 col-6';
+                        col.innerHTML = `
+                            <div class="position-relative">
+                                <img src="${e.target.result}" class="img-fluid rounded" style="height: 100px; width: 100%; object-fit: cover;">
+                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" onclick="removeImage(this)">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        `;
+                        preview.appendChild(col);
+                    };
+                    
+                    reader.readAsDataURL(file);
+                }
+            } else {
+                preview.style.display = 'none';
+            }
+        });
+        
+        function removeImage(button) {
+            button.closest('.col-md-3').remove();
+            const preview = document.getElementById('imagePreview');
+            if (preview.children.length === 0) {
+                preview.style.display = 'none';
+            }
+        }
+        
+        // Preview de imagens para modal de edição
+        document.getElementById('editListingImages').addEventListener('change', function(e) {
+            const files = e.target.files;
+            const preview = document.getElementById('editImagePreview');
+            preview.innerHTML = '';
+            
+            if (files.length > 0) {
+                preview.style.display = 'block';
+                
+                for (let i = 0; i < Math.min(files.length, 10); i++) {
+                    const file = files[i];
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-3 col-sm-4 col-6';
+                        col.innerHTML = `
+                            <div class="position-relative">
+                                <img src="${e.target.result}" class="img-fluid rounded" style="height: 100px; width: 100%; object-fit: cover;">
+                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" onclick="removeEditImage(this)">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        `;
+                        preview.appendChild(col);
+                    };
+                    
+                    reader.readAsDataURL(file);
+                }
+            } else {
+                preview.style.display = 'none';
+            }
+        });
+        
+        function removeEditImage(button) {
+            button.closest('.col-md-3').remove();
+            const preview = document.getElementById('editImagePreview');
+            if (preview.children.length === 0) {
+                preview.style.display = 'none';
+            }
+        }
+        
+        function removeExistingImage(imageUrl) {
+            if (confirm('Tem certeza que deseja excluir esta foto?')) {
+                // Remove da lista de imagens existentes
+                if (currentListing && currentListing.image_url === imageUrl) {
+                    currentListing.image_url = null;
+                }
+                displayExistingImages();
+            }
+        }
+        
+        function displayExistingImages() {
+            const existingImagesDiv = document.getElementById('existingImages');
+            if (!currentListing || !currentListing.image_url) {
+                existingImagesDiv.style.display = 'none';
+                return;
+            }
+            
+            existingImagesDiv.style.display = 'block';
+            existingImagesDiv.innerHTML = `
+                <div class="col-md-3">
+                    <div class="position-relative">
+                        <img src="${currentListing.image_url}" class="img-thumbnail" style="width: 100%; height: 100px; object-fit: cover;">
+                        <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0" 
+                                onclick="removeExistingImage('${currentListing.image_url}')" 
+                                style="border-radius: 50%; width: 25px; height: 25px; padding: 0; margin: 2px;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, setting up event listeners');
+            
+            // Verificar se os elementos existem
+            const form = document.getElementById('newListingForm');
+            const saveBtn = document.getElementById('saveListingBtn');
+            
+            console.log('Form found:', !!form);
+            console.log('Save button found:', !!saveBtn);
+            
+            if (form) {
+                // Prevenir submit do formulário
+                form.addEventListener('submit', function(e) {
+                    console.log('Form submit prevented');
+                    e.preventDefault();
+                    saveListing();
+                });
+            }
+            
+            if (saveBtn) {
+                // Event listener para o botão salvar
+                saveBtn.addEventListener('click', function(e) {
+                    console.log('Save button clicked');
+                    e.preventDefault();
+                    saveListing();
+                });
+            }
+        });
+        
+        // Salvar novo anúncio
+        function saveListing() {
+            console.log('=== SAVE LISTING FUNCTION STARTED ===');
+            console.log('saveListing function called');
+            
+            try {
+                const form = document.getElementById('newListingForm');
+                if (!form) {
+                    console.error('ERROR: Form not found!');
+                    alert('Erro: Formulário não encontrado!');
+                    return;
+                }
+                
+                console.log('✓ Form found successfully');
+                console.log('Creating FormData...');
+                const formData = new FormData();
+                console.log('✓ FormData created successfully');
+            
+            // Dados básicos
+            console.log('Collecting form data...');
+            
+            const title = document.getElementById('listingTitle')?.value || '';
+            console.log('✓ Title:', title);
+            
+            const url = document.getElementById('listingUrl')?.value || '';
+            console.log('✓ URL:', url);
+            
+            const propertyType = document.getElementById('propertyType')?.value || '';
+            console.log('✓ Property Type:', propertyType);
+            
+            const maxGuests = document.getElementById('maxGuests')?.value || '';
+            console.log('✓ Max Guests:', maxGuests);
+            
+            const bedrooms = document.getElementById('bedrooms')?.value || '';
+            console.log('✓ Bedrooms:', bedrooms);
+            
+            const bathrooms = document.getElementById('bathrooms')?.value || '';
+            console.log('✓ Bathrooms:', bathrooms);
+            
+            const pricePerNight = document.getElementById('pricePerNight')?.value || '';
+            console.log('✓ Price Per Night:', pricePerNight);
+            
+            const minimumNights = document.getElementById('minimumNights')?.value || '';
+            console.log('✓ Minimum Nights:', minimumNights);
+            
+            const description = document.getElementById('description')?.value || '';
+            console.log('✓ Description length:', description.length);
+            
+            const address = document.getElementById('address')?.value || '';
+            console.log('✓ Address:', address);
+            
+            console.log('✓ All form data collected successfully');
+            
+            formData.append('title', title);
+            formData.append('url', url);
+            formData.append('property_type', propertyType);
+            formData.append('max_guests', maxGuests);
+            formData.append('bedrooms', bedrooms);
+            formData.append('bathrooms', bathrooms);
+            formData.append('price_per_night', pricePerNight);
+            formData.append('minimum_nights', minimumNights);
+            formData.append('description', description);
+            formData.append('address', address);
+            
+            // Imagens
+            console.log('Processing images...');
+            const imageInput = document.getElementById('listingImages');
+            
+            if (!imageInput) {
+                console.warn('⚠ Image input not found');
+            } else if (!imageInput.files) {
+                console.warn('⚠ No files property on image input');
+            } else {
+                console.log('✓ Image input found with', imageInput.files.length, 'files');
+                
+                for (let i = 0; i < imageInput.files.length; i++) {
+                    const file = imageInput.files[i];
+                    console.log(`✓ Adding image ${i + 1}:`, file.name, 'Size:', file.size, 'bytes');
+                    formData.append('listingImages', file);
+                }
+            }
+            
+            console.log('✓ Images processed successfully');
+            
+            // Validação básica
+            if (!title.trim()) {
+                alert('Por favor, insira um título para o anúncio.');
+                return;
+            }
+            
+            console.log('Preparing to send request to /api/hosting/listing');
+            
+            // Enviar dados
+            fetch('/api/hosting/listing', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('✓ Fetch request sent successfully');
+                console.log('Waiting for response...');
+                console.log('Response received');
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+                
+                if (!response.ok) {
+                    console.error('Response not ok:', response.status, response.statusText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return response.json();
+            })
+            .then(data => {
+                console.log('JSON data parsed successfully');
+                console.log('Response data:', data);
+                
+                if (data.success) {
+                    console.log('Success: Listing created');
+                    alert('Anúncio criado com sucesso!');
+                    
+                    // Fechar modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('newListingModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    // Recarregar página
+                    location.reload();
+                } else {
+                    console.error('Server returned error:', data.error);
+                    alert('Erro ao criar anúncio: ' + (data.error || 'Erro desconhecido'));
+                }
+            })
+            .catch(error => {
+                console.error('=== FETCH ERROR CAUGHT ===');
+                console.error('Error type:', typeof error);
+                console.error('Error message:', error.message);
+                console.error('Error stack:', error.stack);
+                console.error('Full error object:', error);
+                console.error('Erro:', error);
+                alert('Erro ao criar anúncio. Tente novamente.');
+            });
+            
+            } catch (error) {
+                console.error('=== GENERAL ERROR IN SAVE LISTING ===');
+                console.error('Error in saveListing function:', error);
+                console.error('Error message:', error.message);
+                console.error('Error stack:', error.stack);
+                alert('Erro geral ao salvar anúncio: ' + error.message);
+            }
+            
+            console.log('=== SAVE LISTING FUNCTION ENDED ===');
+        }
+        
+        // Variável global para armazenar dados do anúncio atual
+        let currentListing = null;
+        
+        // Editar anúncio
+        function editListing(listingId) {
+            // Buscar dados do anúncio
+            fetch(`/api/hosting/listing/${listingId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const listing = data.listing;
+                    currentListing = listing; // Armazenar globalmente
+                    
+                    // Preencher formulário de edição
+                    document.getElementById('editListingId').value = listing.id;
+                    document.getElementById('editListingTitle').value = listing.title || '';
+                    document.getElementById('editListingUrl').value = listing.url || '';
+                    document.getElementById('editPropertyType').value = listing.property_type || '';
+                    document.getElementById('editMaxGuests').value = listing.max_guests || '';
+                    document.getElementById('editBedrooms').value = listing.bedrooms || '';
+                    document.getElementById('editBathrooms').value = listing.bathrooms || '';
+                    document.getElementById('editPricePerNight').value = listing.price_per_night || '';
+                    document.getElementById('editMinimumNights').value = listing.minimum_nights || '';
+                    document.getElementById('editDescription').value = listing.description || '';
+                    document.getElementById('editAddress').value = listing.address || '';
+                    
+                    // Exibir imagens existentes
+                    displayExistingImages();
+                    
+                    // Mostrar modal
+                    new bootstrap.Modal(document.getElementById('editListingModal')).show();
+                } else {
+                    alert('Erro ao carregar dados do anúncio.');
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao carregar anúncio.');
+            });
+        }
+        
+        // Atualizar anúncio
+        function updateListing() {
+            console.log('updateListing function called');
+            
+            const listingId = document.getElementById('editListingId').value;
+            console.log('Listing ID:', listingId);
+            
+            if (!listingId) {
+                alert('ID do anúncio não encontrado.');
+                return;
+            }
+            
+            const formData = new FormData();
+            
+            // Dados básicos
+            formData.append('title', document.getElementById('editListingTitle').value);
+            formData.append('url', document.getElementById('editListingUrl').value);
+            formData.append('property_type', document.getElementById('editPropertyType').value);
+            formData.append('max_guests', document.getElementById('editMaxGuests').value);
+            formData.append('bedrooms', document.getElementById('editBedrooms').value);
+            formData.append('bathrooms', document.getElementById('editBathrooms').value);
+            formData.append('price_per_night', document.getElementById('editPricePerNight').value);
+            formData.append('minimum_nights', document.getElementById('editMinimumNights').value);
+            formData.append('description', document.getElementById('editDescription').value);
+            formData.append('address', document.getElementById('editAddress').value);
+            
+            // Verificar se a imagem existente foi removida
+            if (currentListing && !currentListing.image_url) {
+                formData.append('remove_existing_image', 'true');
+            }
+            
+            // Imagens
+            const images = document.getElementById('editListingImages').files;
+            console.log('Images to upload:', images.length);
+            for (let i = 0; i < images.length; i++) {
+                formData.append('images', images[i]);
+            }
+            
+            console.log('Sending PUT request to:', `/api/hosting/listing/${listingId}`);
+            
+            fetch(`/api/hosting/listing/${listingId}`, {
+                method: 'PUT',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Anúncio atualizado com sucesso!');
+                    location.reload();
+                } else {
+                    alert('Erro ao atualizar anúncio: ' + (data.error || 'Erro desconhecido'));
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao atualizar anúncio.');
+            });
+        }
+        
+        // Excluir anúncio
+        function deleteListing(listingId) {
+            if (confirm('Tem certeza que deseja excluir este anúncio?')) {
+                fetch(`/api/hosting/listing/${listingId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Anúncio excluído com sucesso!');
+                        location.reload();
+                    } else {
+                        alert('Erro ao excluir anúncio: ' + (data.error || 'Erro desconhecido'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao excluir anúncio.');
+                });
+            }
+        }
+        
+        // Ver anúncio
+        function viewListing(url) {
+            if (url) {
+                window.open(url, '_blank');
+            } else {
+                alert('URL do anúncio não disponível.');
+            }
+        }
+        
+        // Abrir agenda
+        function openAgenda(listingId) {
+            currentListingId = listingId;
+            loadAvailability(listingId);
+            loadRecentBookings(listingId);
+            const modal = new bootstrap.Modal(document.getElementById('agendaModal'));
+            modal.show();
+        }
+        
+        // Carregar disponibilidade
+        function loadAvailability(listingId) {
+            fetch(`/api/agenda/availability/${listingId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayAvailability(data.availability);
+                    } else {
+                        console.error('Erro ao carregar disponibilidade:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                });
+        }
+        
+        // Exibir disponibilidade no calendário
+        function displayAvailability(availability) {
+            const calendarEl = document.getElementById('agenda-calendar');
+            
+            // Garantir que availability seja um array, mesmo se vazio
+            const availabilityEvents = (availability && Array.isArray(availability)) ? 
+                availability.map(item => ({
+                    title: `R$ ${item.price_per_night}/noite`,
+                    start: item.date,
+                    allDay: true,
+                    backgroundColor: item.is_available ? '#28a745' : '#dc3545',
+                    borderColor: item.is_available ? '#28a745' : '#dc3545',
+                    textColor: 'white',
+                    extendedProps: {
+                        availabilityId: item.id,
+                        date: item.date,
+                        price: item.price_per_night,
+                        type: 'availability'
+                    }
+                })) : [];
+            
+            // Buscar reservas e adicionar ao calendário
+            let allEvents = [...availabilityEvents];
+            
+            if (currentListingId) {
+                fetch(`/api/agenda/bookings/${currentListingId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.bookings) {
+                            const bookingEvents = data.bookings.map(booking => {
+                                // Definir cores baseadas no status da reserva
+                                let backgroundColor, borderColor, textColor;
+                                if (booking.status === 'cancelled') {
+                                    backgroundColor = 'white';
+                                    borderColor = '#dc3545';
+                                    textColor = '#dc3545';
+                                } else {
+                                    backgroundColor = '#dc3545';
+                                    borderColor = '#dc3545';
+                                    textColor = 'white';
+                                }
+                                
+                                return {
+                                    title: `Reserva - ${booking.guest_name || 'Hóspede'}`,
+                                    start: booking.checkin_date,
+                                    end: booking.checkout_date,
+                                    allDay: true,
+                                    backgroundColor: backgroundColor,
+                                    borderColor: borderColor,
+                                    textColor: textColor,
+                                    extendedProps: {
+                                        bookingId: booking.id,
+                                        guestName: booking.guest_name,
+                                        totalPrice: booking.total_price,
+                                        status: booking.status,
+                                        type: 'booking'
+                                    }
+                                };
+                            });
+                            
+                            allEvents = [...availabilityEvents, ...bookingEvents];
+                            renderCalendar(allEvents);
+                        } else {
+                            renderCalendar(allEvents);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar reservas:', error);
+                        renderCalendar(allEvents);
+                    });
+            } else {
+                renderCalendar(allEvents);
+            }
+        }
+        
+        // Renderizar calendário com eventos
+        function renderCalendar(events) {
+            const calendarEl = document.getElementById('agenda-calendar');
+            
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth'
+                },
+                buttonText: {
+                    today: 'Hoje',
+                    month: 'Mês',
+                    week: 'Semana',
+                    day: 'Dia'
+                },
+                dayHeaderFormat: { weekday: 'short' },
+                events: events,
+                selectable: true,
+                select: function(info) {
+                    openAvailabilityForm(info.start, info.end);
+                },
+                eventDidMount: function(info) {
+                    // Adicionar tooltip com informações
+                    if (info.event.extendedProps.type === 'booking') {
+                        info.el.setAttribute('title', `Reserva: ${info.event.extendedProps.guestName || 'Hóspede'} - R$ ${parseFloat(info.event.extendedProps.totalPrice || 0).toFixed(2)}`);
+                    } else {
+                        info.el.setAttribute('title', info.event.title);
+                    }
+                },
+                eventContent: function(arg) {
+                    const eventEl = document.createElement('div');
+                    eventEl.style.position = 'relative';
+                    eventEl.style.padding = '2px';
+                    
+                    if (arg.event.extendedProps.type === 'booking') {
+                        // Evento de reserva - sem botão de remoção
+                        eventEl.innerHTML = `
+                            <div style="font-size: 10px; text-align: center;">
+                                <span>${arg.event.title}</span>
+                            </div>
+                        `;
+                    } else {
+                        // Evento de disponibilidade - com botão de remoção
+                        eventEl.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 10px;">${arg.event.title}</span>
+                                <button onclick="removeAvailability('${arg.event.extendedProps.date}')" 
+                                        style="background: rgba(255,255,255,0.8); border: none; border-radius: 50%; 
+                                               width: 16px; height: 16px; font-size: 10px; cursor: pointer; 
+                                               color: #dc3545; font-weight: bold; margin-left: 4px;"
+                                        title="Remover disponibilidade">
+                                    ×
+                                </button>
+                            </div>
+                        `;
+                    }
+                    return { domNodes: [eventEl] };
+                }
+            });
+            
+            calendar.render();
+            
+            // Mostrar mensagem informativa se não há dados
+            if (!events || events.length === 0) {
+                setTimeout(() => {
+                    const calendarContent = calendarEl.querySelector('.fc-daygrid-body');
+                    if (calendarContent && !calendarContent.querySelector('.no-availability-message')) {
+                        const message = document.createElement('div');
+                        message.className = 'no-availability-message text-center text-muted p-3';
+                        message.style.position = 'absolute';
+                        message.style.top = '50%';
+                        message.style.left = '50%';
+                        message.style.transform = 'translate(-50%, -50%)';
+                        message.style.zIndex = '10';
+                        message.style.backgroundColor = 'rgba(255,255,255,0.9)';
+                        message.style.borderRadius = '8px';
+                        message.style.padding = '20px';
+                        message.innerHTML = '<i class="fas fa-calendar-plus fa-2x mb-2 d-block"></i>Nenhuma disponibilidade configurada.<br><small>Clique e arraste no calendário para adicionar datas.</small>';
+                        calendarEl.style.position = 'relative';
+                        calendarEl.appendChild(message);
+                    }
+                }, 100);
+            }
+        }
+        
+        // Abrir formulário de disponibilidade
+        function openAvailabilityForm(startDate, endDate) {
+            document.getElementById('availabilityStartDate').value = startDate.toISOString().split('T')[0];
+            document.getElementById('availabilityEndDate').value = endDate.toISOString().split('T')[0];
+            const modal = new bootstrap.Modal(document.getElementById('availabilityModal'));
+            modal.show();
+        }
+        
+        // Salvar disponibilidade
+        function saveAvailability() {
+            const startDate = document.getElementById('availabilityStartDate').value;
+            const endDate = document.getElementById('availabilityEndDate').value;
+            const pricePerNight = document.getElementById('availabilityPrice').value;
+            
+            if (!startDate || !endDate || !pricePerNight) {
+                alert('Todos os campos são obrigatórios');
+                return;
+            }
+            
+            fetch('/api/agenda/availability', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    listing_id: currentListingId,
+                    start_date: startDate,
+                    end_date: endDate,
+                    price_per_night: parseFloat(pricePerNight)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Disponibilidade salva com sucesso!');
+                    bootstrap.Modal.getInstance(document.getElementById('availabilityModal')).hide();
+                    loadAvailability(currentListingId);
+                } else {
+                    alert('Erro ao salvar disponibilidade: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao salvar disponibilidade.');
+            });
+        }
+        
+        function removeAvailability(date) {
+            if (!currentListingId) {
+                alert('Por favor, selecione um anúncio primeiro.');
+                return;
+            }
+
+            if (confirm('Tem certeza que deseja remover a disponibilidade desta data?')) {
+                fetch(`/api/agenda/availability/${currentListingId}/${date}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Disponibilidade removida com sucesso!');
+                        loadAvailability(currentListingId); // Recarregar o calendário
+                    } else {
+                        alert('Erro ao remover disponibilidade: ' + (data.error || 'Erro desconhecido'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao remover disponibilidade.');
+                });
+            }
+        }
+        
+        let currentListingId = null;
+        
+        // Carregar reservas recentes
+        function loadRecentBookings(listingId) {
+            fetch(`/api/agenda/recent-bookings/${listingId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayRecentBookings(data.bookings);
+                    } else {
+                        console.error('Erro ao carregar reservas:', data.error);
+                        document.getElementById('recentBookings').innerHTML = '<p class="text-muted small">Erro ao carregar reservas</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    document.getElementById('recentBookings').innerHTML = '<p class="text-muted small">Erro ao carregar reservas</p>';
+                });
+        }
+        
+        // Exibir reservas recentes
+        function displayRecentBookings(bookings) {
+            const container = document.getElementById('recentBookings');
+            
+            if (!bookings || bookings.length === 0) {
+                container.innerHTML = '<p class="text-muted small">Nenhuma reserva encontrada</p>';
+                return;
+            }
+            
+            let html = '';
+            bookings.slice(0, 5).forEach(booking => {
+                const statusClass = {
+                    'pending': 'warning',
+                    'confirmed': 'success',
+                    'cancelled': 'danger',
+                    'completed': 'info'
+                }[booking.status] || 'secondary';
+                
+                const statusText = {
+                    'pending': 'Pendente',
+                    'confirmed': 'Confirmada',
+                    'cancelled': 'Cancelada',
+                    'completed': 'Concluída'
+                }[booking.status] || booking.status;
+                
+                const cardClass = booking.status === 'cancelled' ? 'bg-white border border-danger' : '';
+                const priceClass = booking.status === 'cancelled' ? 'text-danger' : 'text-success';
+                
+                html += `
+                    <div class="border-bottom pb-2 mb-2 ${cardClass}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong class="small">${booking.guest_name || 'Hóspede'}</strong>
+                                <br>
+                                <span class="text-muted small">${booking.checkin_date} a ${booking.checkout_date}</span>
+                            </div>
+                            <span class="badge bg-${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="mt-1 d-flex justify-content-between align-items-center">
+                            <span class="${priceClass} small">R$ ${parseFloat(booking.total_price || 0).toFixed(2)}</span>
+                            <div class="btn-group" role="group">
+                                ${booking.status === 'pending' ? 
+                                    `<button class="btn btn-outline-success btn-sm" onclick="confirmHostReservation(${booking.id}, '${booking.guest_name || 'Hóspede'}')" title="Confirmar Reserva">
+                                        <i class="fas fa-check"></i>
+                                    </button>` : ''}
+                                ${(booking.status === 'pending' || booking.status === 'confirmed') ? 
+                                    `<button class="btn btn-outline-danger btn-sm" onclick="cancelHostReservation(${booking.id}, '${booking.guest_name || 'Hóspede'}')" title="Cancelar Reserva">
+                                        <i class="fas fa-times"></i>
+                                    </button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+    </script>
+    
+    <!-- Modal Agenda -->
+    <div class="modal fade" id="agendaModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-calendar-alt me-2"></i>Agenda de Disponibilidade
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div id="agenda-calendar"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Instruções</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small mb-2">• Clique e arraste no calendário para selecionar datas</p>
+                                    <p class="small mb-2">• <span class="badge bg-success">Verde</span> = Disponível</p>
+                                    <p class="small mb-0">• <span class="badge bg-danger">Vermelho</span> = Ocupado</p>
+                                </div>
+                            </div>
+                            
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Reservas Recentes</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="recentBookings">
+                                        <p class="text-muted small">Carregando reservas...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Adicionar Disponibilidade -->
+    <div class="modal fade" id="availabilityModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus me-2"></i>Adicionar Disponibilidade
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="availabilityStartDate" class="form-label">Data de Início</label>
+                            <input type="date" class="form-control" id="availabilityStartDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="availabilityEndDate" class="form-label">Data de Fim</label>
+                            <input type="date" class="form-control" id="availabilityEndDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="availabilityPrice" class="form-label">Preço por Noite (R$)</label>
+                            <input type="number" class="form-control" id="availabilityPrice" step="0.01" min="0" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAvailability()">
+                        <i class="fas fa-save me-2"></i>Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function confirmHostReservation(bookingId, guestName) {
+            if (confirm(`Tem certeza que deseja confirmar a reserva de ${guestName}?`)) {
+                fetch(`/api/confirm-booking/${bookingId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Reserva confirmada com sucesso!');
+                        // Recarregar as reservas
+                        if (currentListingId) {
+                            loadRecentBookings(currentListingId);
+                        }
+                    } else {
+                        alert('Erro ao confirmar reserva: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao confirmar reserva');
+                });
+            }
+        }
+        
+        function cancelHostReservation(bookingId, guestName) {
+            if (confirm(`Tem certeza que deseja cancelar a reserva de ${guestName}?`)) {
+                fetch(`/api/cancel-booking/${bookingId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Reserva cancelada com sucesso!');
+                        // Recarregar as reservas
+                        if (currentListingId) {
+                            loadRecentBookings(currentListingId);
+                        }
+                    } else {
+                        alert('Erro ao cancelar reserva: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao cancelar reserva');
+                });
+            }
+        }
+    </script>
+    
+    <!-- FullCalendar CSS -->
+    <link href="{{ url_for('static', filename='fullcalendar/fullcalendar.min.css') }}" rel="stylesheet">
+    
+    <!-- FullCalendar JS -->
+    <script src="{{ url_for('static', filename='fullcalendar/fullcalendar.min.js') }}"></script>
+
+</body>
+</html>

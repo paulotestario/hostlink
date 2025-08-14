@@ -600,6 +600,698 @@ class HostLinkDatabase:
         except Exception as e:
             print(f"❌ Erro ao buscar análises do usuário: {e}")
             return []
+    
+    # ===== FUNÇÕES DE AGENDA E DISPONIBILIDADE =====
+    
+    def save_listing_availability(self, listing_id: int, user_id: int, date: str, 
+                                is_available: bool = True, price_per_night: float = None,
+                                minimum_nights: int = 1, maximum_nights: int = None,
+                                notes: str = None) -> bool:
+        """
+        Salva ou atualiza disponibilidade de uma data específica para um anúncio
+        """
+        try:
+            data = {
+                'listing_id': listing_id,
+                'user_id': user_id,
+                'date': date,
+                'is_available': is_available,
+                'minimum_nights': minimum_nights,
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            if price_per_night is not None:
+                data['price_per_night'] = price_per_night
+            if maximum_nights is not None:
+                data['maximum_nights'] = maximum_nights
+            if notes:
+                data['notes'] = notes
+            
+            # Usar upsert para inserir ou atualizar
+            result = self.supabase.table('listing_availability').upsert(
+                data, on_conflict='listing_id,date'
+            ).execute()
+            
+            return len(result.data) > 0
+        except Exception as e:
+            print(f"❌ Erro ao salvar disponibilidade: {e}")
+            return False
+    
+    def get_listing_availability(self, listing_id: int, start_date: str = None, 
+                               end_date: str = None) -> List[Dict]:
+        """
+        Busca disponibilidade de um anúncio em um período
+        """
+        try:
+            query = self.supabase.table('listing_availability').select('*').eq('listing_id', listing_id)
+            
+            if start_date:
+                query = query.gte('date', start_date)
+            if end_date:
+                query = query.lte('date', end_date)
+                
+            result = query.order('date').execute()
+            return result.data
+        except Exception as e:
+            print(f"❌ Erro ao buscar disponibilidade: {e}")
+            return []
+    
+    def save_booking(self, listing_id: int, guest_user_id: int, host_user_id: int,
+                   checkin_date: str, checkout_date: str, total_nights: int,
+                   price_per_night: float, total_price: float, guest_name: str,
+                   guest_email: str, guest_phone: str = None, booking_notes: str = None) -> int:
+        """
+        Salva uma nova reserva
+        """
+        try:
+            data = {
+                'listing_id': listing_id,
+                'guest_user_id': guest_user_id,
+                'host_user_id': host_user_id,
+                'checkin_date': checkin_date,
+                'checkout_date': checkout_date,
+                'total_nights': total_nights,
+                'price_per_night': price_per_night,
+                'total_price': total_price,
+                'guest_name': guest_name,
+                'guest_email': guest_email,
+                'status': 'pending',
+                'payment_status': 'pending',
+                'created_at': datetime.now().isoformat()
+            }
+            
+            if guest_phone:
+                data['guest_phone'] = guest_phone
+            if booking_notes:
+                data['booking_notes'] = booking_notes
+            
+            result = self.supabase.table('listing_bookings').insert(data).execute()
+            return result.data[0]['id'] if result.data else None
+        except Exception as e:
+            print(f"❌ Erro ao salvar reserva: {e}")
+            return None
+    
+    def get_listing_bookings(self, listing_id: int = None, user_id: int = None, 
+                           status: str = None) -> List[Dict]:
+        """
+        Busca reservas por anúncio, usuário ou status
+        """
+        try:
+            query = self.supabase.table('listing_bookings').select(
+                '*, user_listings(title), users!guest_user_id(name, email)'
+            )
+            
+            if listing_id:
+                query = query.eq('listing_id', listing_id)
+            if user_id:
+                query = query.eq('host_user_id', user_id)
+            if status:
+                query = query.eq('status', status)
+                
+            result = query.order('created_at', desc=True).execute()
+            return result.data
+        except Exception as e:
+            print(f"❌ Erro ao buscar reservas: {e}")
+            return []
+    
+    def update_booking_status(self, booking_id: int, status: str, payment_status: str = None) -> bool:
+        """
+        Atualiza status de uma reserva
+        """
+        try:
+            data = {
+                'status': status,
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            if payment_status:
+                data['payment_status'] = payment_status
+            
+            result = self.supabase.table('listing_bookings').update(data).eq('id', booking_id).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            print(f"❌ Erro ao atualizar status da reserva: {e}")
+            return False
+    
+    def save_listing_availability_period(self, listing_id: int, user_id: int, start_date: str, end_date: str, 
+                                        price_per_night: float, minimum_nights: int = 1, 
+                                        maximum_nights: int = None, notes: str = None) -> bool:
+        """
+        Salva disponibilidade para um período de datas
+        """
+        try:
+            from datetime import datetime, timedelta
+            
+            current_date = datetime.strptime(start_date, '%Y-%m-%d')
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+            
+            success_count = 0
+            while current_date <= end_dt:
+                date_str = current_date.strftime('%Y-%m-%d')
+                
+                if self.save_listing_availability(
+                    listing_id=listing_id,
+                    user_id=user_id,
+                    date=date_str,
+                    is_available=True,
+                    price_per_night=price_per_night,
+                    minimum_nights=minimum_nights,
+                    maximum_nights=maximum_nights,
+                    notes=notes
+                ):
+                    success_count += 1
+                
+                current_date += timedelta(days=1)
+            
+            return success_count > 0
+        except Exception as e:
+            print(f"❌ Erro ao salvar disponibilidade por período: {e}")
+            return False
+
+    def get_available_dates(self, listing_id: int, start_date: str, end_date: str) -> List[str]:
+        """
+        Retorna lista de datas disponíveis para reserva em um período
+        """
+        try:
+            # Buscar disponibilidade configurada
+            availability = self.get_listing_availability(listing_id, start_date, end_date)
+            
+            # Buscar reservas confirmadas no período
+            bookings = self.supabase.table('listing_bookings').select(
+                'checkin_date, checkout_date'
+            ).eq('listing_id', listing_id).in_('status', ['confirmed', 'pending']).execute()
+            
+            available_dates = []
+            
+            # Se não há configuração de disponibilidade, assumir que todas as datas estão disponíveis
+            if not availability:
+                from datetime import datetime, timedelta
+                current_date = datetime.strptime(start_date, '%Y-%m-%d')
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                
+                while current_date <= end_dt:
+                    date_str = current_date.strftime('%Y-%m-%d')
+                    
+                    # Verificar se não está ocupada por reserva
+                    is_booked = False
+                    for booking in bookings.data:
+                        if booking['checkin_date'] <= date_str <= booking['checkout_date']:
+                            is_booked = True
+                            break
+                    
+                    if not is_booked:
+                        available_dates.append(date_str)
+                    
+                    current_date += timedelta(days=1)
+            else:
+                # Usar configuração de disponibilidade
+                for avail in availability:
+                    if avail['is_available']:
+                        date_str = avail['date']
+                        
+                        # Verificar se não está ocupada por reserva
+                        is_booked = False
+                        for booking in bookings.data:
+                            if booking['checkin_date'] <= date_str <= booking['checkout_date']:
+                                is_booked = True
+                                break
+                        
+                        if not is_booked:
+                            available_dates.append(date_str)
+            
+            return sorted(available_dates)
+        except Exception as e:
+            print(f"❌ Erro ao buscar datas disponíveis: {e}")
+            return []
+
+    def delete_listing_availability(self, listing_id: int, date: str, user_id: int = None) -> bool:
+        """
+        Remove disponibilidade de uma data específica para um anúncio
+        """
+        try:
+            query = self.supabase.table('listing_availability').delete().eq('listing_id', listing_id).eq('date', date)
+            
+            # Se user_id for fornecido, adicionar à query para segurança
+            if user_id:
+                query = query.eq('user_id', user_id)
+            
+            result = query.execute()
+            return len(result.data) > 0
+        except Exception as e:
+            print(f"❌ Erro ao remover disponibilidade: {e}")
+            return False
+
+    def get_all_public_listings(self) -> List[Dict]:
+        """Buscar todos os anúncios da tabela com informações de disponibilidade e reservas pendentes"""
+        try:
+            result = self.supabase.table('user_listings').select('*').eq('is_active', True).execute()
+            
+            if not result.data:
+                return []
+            
+            # Adicionar informações de disponibilidade e reservas pendentes para cada anúncio
+            listings_with_status = []
+            for listing in result.data:
+                # Buscar próximas datas disponíveis
+                availability_result = self.supabase.table('listing_availability').select(
+                    'date, is_available'
+                ).eq('listing_id', listing['id']).eq('is_available', True).gte('date', datetime.now().strftime('%Y-%m-%d')).order('date').limit(5).execute()
+                
+                # Buscar reservas pendentes
+                pending_bookings = self.supabase.table('listing_bookings').select(
+                    'checkin_date, checkout_date'
+                ).eq('listing_id', listing['id']).eq('status', 'pending').execute()
+                
+                # Adicionar informações ao anúncio
+                listing['available_dates'] = [item['date'] for item in availability_result.data] if availability_result.data else []
+                listing['has_pending_bookings'] = len(pending_bookings.data) > 0 if pending_bookings.data else False
+                listing['pending_periods'] = []
+                
+                if pending_bookings.data:
+                    for booking in pending_bookings.data:
+                        listing['pending_periods'].append({
+                            'start': booking['checkin_date'],
+                            'end': booking['checkout_date']
+                        })
+                
+                listings_with_status.append(listing)
+            
+            return listings_with_status
+        except Exception as e:
+            print(f"❌ Erro ao buscar anúncios públicos: {e}")
+            return []
+    
+    def get_public_listing_by_id(self, listing_id: int) -> Optional[Dict]:
+        """Buscar um anúncio específico por ID"""
+        try:
+            result = self.supabase.table('user_listings').select(
+                '*, municipios(nome, estado), users(name, email)'
+            ).eq('id', listing_id).eq('is_active', True).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            print(f"❌ Erro ao buscar anúncio por ID {listing_id}: {e}")
+            return None
+    
+    def get_listings_available_on_date(self, date: str) -> List[Dict]:
+        """Buscar anúncios disponíveis em uma data específica"""
+        try:
+            # Buscar anúncios que têm disponibilidade na data
+            availability_result = self.supabase.table('listing_availability').select(
+                'listing_id'
+            ).eq('date', date).eq('is_available', True).execute()
+            
+            if not availability_result.data:
+                return []
+            
+            # Extrair IDs dos anúncios disponíveis
+            listing_ids = [item['listing_id'] for item in availability_result.data]
+            
+            # Buscar detalhes dos anúncios
+            listings_result = self.supabase.table('user_listings').select(
+                '*'
+            ).in_('id', listing_ids).eq('is_active', True).execute()
+            
+            # Adicionar informações de preço da disponibilidade
+            listings_with_price = []
+            for listing in listings_result.data:
+                # Buscar preço específico para a data
+                price_result = self.supabase.table('listing_availability').select(
+                    'price_per_night'
+                ).eq('listing_id', listing['id']).eq('date', date).execute()
+                
+                if price_result.data:
+                    listing['price_for_date'] = price_result.data[0]['price_per_night']
+                else:
+                    listing['price_for_date'] = listing.get('price_per_night', 0)
+                
+                listings_with_price.append(listing)
+            
+            return listings_with_price
+        except Exception as e:
+            print(f"❌ Erro ao buscar anúncios disponíveis na data {date}: {e}")
+            return []
+    
+    def check_availability(self, listing_id: int, start_date: str, end_date: str) -> bool:
+        """Verificar se um anúncio está disponível em um período"""
+        try:
+            # Buscar disponibilidade no período
+            result = self.supabase.table('listing_availability').select(
+                'date, is_available'
+            ).eq('listing_id', listing_id).gte('date', start_date).lte('date', end_date).execute()
+            
+            if not result.data:
+                return False
+            
+            # Verificar se todas as datas estão disponíveis
+            for item in result.data:
+                if not item['is_available']:
+                    return False
+            
+            # Verificar se não há reservas conflitantes
+            bookings_result = self.supabase.table('listing_bookings').select(
+                'checkin_date, checkout_date'
+            ).eq('listing_id', listing_id).eq('status', 'confirmed').execute()
+            
+            for booking in bookings_result.data:
+                booking_start = booking['checkin_date']
+                booking_end = booking['checkout_date']
+                
+                # Verificar sobreposição de datas
+                if (start_date <= booking_end and end_date >= booking_start):
+                    return False
+            
+            return True
+        except Exception as e:
+            print(f"❌ Erro ao verificar disponibilidade: {e}")
+            return False
+    
+    def create_public_booking(self, listing_id: int, start_date: str, end_date: str,
+                            guest_name: str, guest_email: str, guest_phone: str = None) -> int:
+        """Criar uma reserva pública"""
+        try:
+            # Calcular número de noites
+            from datetime import datetime
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            end = datetime.strptime(end_date, '%Y-%m-%d')
+            total_nights = (end - start).days
+            
+            # Buscar preço do anúncio
+            listing_result = self.supabase.table('user_listings').select(
+                'price_per_night, user_id'
+            ).eq('id', listing_id).execute()
+            
+            if not listing_result.data:
+                return None
+            
+            listing = listing_result.data[0]
+            price_per_night = listing.get('price_per_night', 0)
+            host_user_id = listing['user_id']
+            total_price = price_per_night * total_nights
+            
+            # Criar reserva
+            booking_data = {
+                'listing_id': listing_id,
+                'guest_user_id': None,  # Reserva pública sem usuário logado
+                'host_user_id': host_user_id,
+                'checkin_date': start_date,
+                'checkout_date': end_date,
+                'total_nights': total_nights,
+                'price_per_night': price_per_night,
+                'total_price': total_price,
+                'guest_name': guest_name,
+                'guest_email': guest_email,
+                'guest_phone': guest_phone,
+                'status': 'pending',
+                'payment_status': 'pending',
+                'created_at': datetime.now().isoformat()
+            }
+            
+            result = self.supabase.table('listing_bookings').insert(booking_data).execute()
+            
+            if result.data:
+                return result.data[0]['id']
+            return None
+        except Exception as e:
+            print(f"❌ Erro ao criar reserva pública: {e}")
+            return None
+    
+    def create_authenticated_booking(self, listing_id: int, guest_user_id: int, start_date: str, end_date: str,
+                                   guest_name: str, guest_email: str, guests_count: int = 1) -> int:
+        """Criar uma reserva para usuário autenticado"""
+        try:
+            # Calcular número de noites
+            from datetime import datetime
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            end = datetime.strptime(end_date, '%Y-%m-%d')
+            total_nights = (end - start).days
+            
+            # Buscar preço do anúncio
+            listing_result = self.supabase.table('user_listings').select(
+                'price_per_night, user_id'
+            ).eq('id', listing_id).execute()
+            
+            if not listing_result.data:
+                return None
+            
+            listing = listing_result.data[0]
+            price_per_night = listing.get('price_per_night', 0)
+            host_user_id = listing['user_id']
+            total_price = price_per_night * total_nights
+            
+            # Criar reserva (removendo guests_count que não existe na tabela)
+            booking_data = {
+                'listing_id': listing_id,
+                'guest_user_id': guest_user_id,
+                'host_user_id': host_user_id,
+                'checkin_date': start_date,
+                'checkout_date': end_date,
+                'total_nights': total_nights,
+                'price_per_night': price_per_night,
+                'total_price': total_price,
+                'guest_name': guest_name,
+                'guest_email': guest_email,
+                'status': 'pending',
+                'payment_status': 'pending',
+                'created_at': datetime.now().isoformat()
+            }
+            
+            result = self.supabase.table('listing_bookings').insert(booking_data).execute()
+            
+            if result.data:
+                print(f"✅ Reserva autenticada criada com ID: {result.data[0]['id']} para usuário {guest_user_id}")
+                return result.data[0]['id']
+            return None
+        except Exception as e:
+            print(f"❌ Erro ao criar reserva autenticada: {e}")
+            return None
+    
+    def get_user_bookings(self, user_id: int) -> List[Dict]:
+        """Buscar todas as reservas feitas por um usuário como hóspede"""
+        try:
+            result = self.supabase.table('listing_bookings').select(
+                '*, user_listings(id, title, url, image_url, municipio_id, municipios(nome))'
+            ).eq('guest_user_id', user_id).order('created_at', desc=True).execute()
+            
+            return result.data if result.data else []
+        except Exception as e:
+            print(f"❌ Erro ao buscar reservas do usuário: {e}")
+            return []
+    
+    def get_user_reservation_for_listing(self, user_id: int, listing_id: int) -> Optional[Dict]:
+        """Verificar se o usuário tem uma reserva ativa para um anúncio específico"""
+        try:
+            result = self.supabase.table('listing_bookings').select(
+                '*, user_listings(id, title, url, image_url)'
+            ).eq('guest_user_id', user_id).eq('listing_id', listing_id).in_('status', ['confirmed', 'pending']).execute()
+            
+            return result.data[0] if result.data else None
+        except Exception as e:
+            print(f"❌ Erro ao verificar reserva do usuário: {e}")
+            return None
+    
+    def get_next_available_date(self, listing_id: int, from_date: str) -> str:
+        """Buscar a próxima data disponível para um anúncio a partir de uma data específica"""
+        try:
+            from datetime import datetime, timedelta
+            
+            # Converter data inicial
+            start_date = datetime.strptime(from_date, '%Y-%m-%d')
+            
+            # Buscar até 365 dias à frente
+            for i in range(365):
+                check_date = start_date + timedelta(days=i)
+                check_date_str = check_date.strftime('%Y-%m-%d')
+                
+                # Verificar se a data está disponível
+                if self.check_availability(listing_id, check_date_str, check_date_str):
+                    return check_date_str
+            
+            # Se não encontrou nenhuma data disponível nos próximos 365 dias
+            return None
+            
+        except Exception as e:
+            print(f"❌ Erro ao buscar próxima data disponível: {e}")
+            return None
+    
+    def get_available_period(self, listing_id: int, from_date: str) -> dict:
+        """Buscar o período de disponibilidade contínua a partir de uma data específica"""
+        try:
+            from datetime import datetime, timedelta
+            
+            # Converter data inicial
+            start_date = datetime.strptime(from_date, '%Y-%m-%d')
+            
+            # Buscar até 365 dias à frente
+            available_start = None
+            available_end = None
+            
+            for i in range(365):
+                check_date = start_date + timedelta(days=i)
+                check_date_str = check_date.strftime('%Y-%m-%d')
+                
+                # Verificar se a data está disponível
+                if self.check_availability(listing_id, check_date_str, check_date_str):
+                    if available_start is None:
+                        available_start = check_date_str
+                    available_end = check_date_str
+                else:
+                    # Se encontrou uma data indisponível e já tinha um período, parar
+                    if available_start is not None:
+                        break
+            
+            if available_start and available_end:
+                return {
+                    'start_date': available_start,
+                    'end_date': available_end
+                }
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ Erro ao buscar período disponível: {e}")
+            return None
+
+    # =====================================================
+    # FUNÇÕES DE FAVORITOS
+    # =====================================================
+    
+    def add_favorite(self, user_id: int, listing_id: int) -> bool:
+        """
+        Adiciona um anúncio aos favoritos do usuário
+        """
+        try:
+            result = self.supabase.table('user_favorites').insert({
+                'user_id': user_id,
+                'listing_id': listing_id
+            }).execute()
+            
+            if result.data:
+                print(f"✅ Anúncio {listing_id} adicionado aos favoritos do usuário {user_id}")
+                return True
+            return False
+            
+        except Exception as e:
+            # Se for erro de duplicata (UNIQUE constraint), considerar como sucesso
+            if 'duplicate key value' in str(e).lower() or 'unique constraint' in str(e).lower():
+                print(f"ℹ️ Anúncio {listing_id} já está nos favoritos do usuário {user_id}")
+                return True
+            # Se a tabela não existir, avisar mas não falhar
+            if 'does not exist' in str(e).lower() or 'not found' in str(e).lower():
+                print(f"⚠️ Tabela user_favorites não existe. Execute o SQL de criação no Supabase.")
+                return False
+            print(f"❌ Erro ao adicionar favorito: {e}")
+            return False
+    
+    def remove_favorite(self, user_id: int, listing_id: int) -> bool:
+        """
+        Remove um anúncio dos favoritos do usuário
+        """
+        try:
+            result = self.supabase.table('user_favorites').delete().eq(
+                'user_id', user_id
+            ).eq('listing_id', listing_id).execute()
+            
+            print(f"✅ Anúncio {listing_id} removido dos favoritos do usuário {user_id}")
+            return True
+            
+        except Exception as e:
+            # Se a tabela não existir, avisar mas não falhar
+            if 'does not exist' in str(e).lower() or 'not found' in str(e).lower():
+                print(f"⚠️ Tabela user_favorites não existe. Execute o SQL de criação no Supabase.")
+                return False
+            print(f"❌ Erro ao remover favorito: {e}")
+            return False
+    
+    def get_user_favorites(self, user_id: int) -> List[Dict]:
+        """
+        Busca todos os anúncios favoritos de um usuário
+        """
+        try:
+            result = self.supabase.table('user_favorites').select(
+                '*, user_listings(*, municipios(nome, estado))'
+            ).eq('user_id', user_id).order('created_at', desc=True).execute()
+            
+            return result.data
+            
+        except Exception as e:
+            # Se a tabela não existir, retornar lista vazia
+            if 'does not exist' in str(e).lower() or 'not found' in str(e).lower():
+                print(f"⚠️ Tabela user_favorites não existe. Execute o SQL de criação no Supabase.")
+                return []
+            print(f"❌ Erro ao buscar favoritos do usuário {user_id}: {e}")
+            return []
+    
+    def is_favorite(self, user_id: int, listing_id: int) -> bool:
+        """
+        Verifica se um anúncio é favorito de um usuário
+        """
+        try:
+            result = self.supabase.table('user_favorites').select('id').eq(
+                'user_id', user_id
+            ).eq('listing_id', listing_id).execute()
+            
+            return len(result.data) > 0
+            
+        except Exception as e:
+            print(f"❌ Erro ao verificar se anúncio é favorito: {e}")
+            return False
+    
+    def get_favorites_count(self, user_id: int) -> int:
+        """
+        Conta quantos favoritos um usuário tem
+        """
+        try:
+            result = self.supabase.table('user_favorites').select(
+                'id', count='exact'
+            ).eq('user_id', user_id).execute()
+            
+            return result.count or 0
+            
+        except Exception as e:
+            print(f"❌ Erro ao contar favoritos do usuário {user_id}: {e}")
+            return 0
+    
+    def get_most_favorited_listings(self, limit: int = 10) -> List[Dict]:
+        """
+        Busca os anúncios mais favoritados
+        """
+        try:
+            # Esta consulta pode precisar ser ajustada dependendo do Supabase
+            result = self.supabase.rpc('get_most_favorited_listings', {
+                'limit_count': limit
+            }).execute()
+            
+            return result.data or []
+            
+        except Exception as e:
+            print(f"❌ Erro ao buscar anúncios mais favoritados: {e}")
+            # Fallback: buscar favoritos de forma simples
+            try:
+                result = self.supabase.table('user_favorites').select(
+                    'listing_id, user_listings(title, url, price_per_night, rating)'
+                ).execute()
+                
+                # Agrupar por listing_id e contar
+                from collections import Counter
+                listing_counts = Counter([fav['listing_id'] for fav in result.data])
+                
+                # Buscar detalhes dos mais favoritados
+                most_favorited = []
+                for listing_id, count in listing_counts.most_common(limit):
+                    listing_result = self.supabase.table('user_listings').select(
+                        '*, municipios(nome, estado)'
+                    ).eq('id', listing_id).execute()
+                    
+                    if listing_result.data:
+                        listing = listing_result.data[0]
+                        listing['favorite_count'] = count
+                        most_favorited.append(listing)
+                
+                return most_favorited
+                
+            except Exception as e2:
+                print(f"❌ Erro no fallback para anúncios mais favoritados: {e2}")
+                return []
 
     def test_connection(self) -> bool:
         """

@@ -74,6 +74,78 @@
                 <a class="nav-link" href="/similaridade">
                     <i class="fas fa-search me-2"></i>Análise de Similaridade
                 </a>
+                <a class="nav-link" href="/hosting">
+                    <i class="fas fa-home me-2"></i>Hospedar
+                </a>
+                
+                <!-- Informações do usuário -->
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                        {% if current_user.profile_pic %}
+                            <img src="{{ current_user.profile_pic }}" alt="{{ current_user.name }}" class="rounded-circle me-2" width="32" height="32">
+                        {% else %}
+                            <i class="fas fa-user-circle me-2" style="font-size: 1.5rem;"></i>
+                        {% endif %}
+                        {{ current_user.name }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        
+                        <!-- Seção Principal -->
+                        <li><a class="dropdown-item" href="{{ url_for('favoritos') }}">
+                            <i class="fas fa-heart me-2"></i>Favoritos
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('anuncios_publicos') }}">
+                            <i class="fas fa-suitcase me-2"></i>Viagens
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}">
+                            <i class="fas fa-calendar-check me-2"></i>Minhas Reservas
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-comments me-2"></i>Mensagens
+                        </a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('perfil') }}">
+                            <i class="fas fa-user me-2"></i>Perfil
+                        </a></li>
+                        
+                        <li><hr class="dropdown-divider"></li>
+                        
+                        <!-- Seção Configurações -->
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-bell me-2"></i>Notificações
+                            <span class="badge bg-danger ms-2">1</span>
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-cog me-2"></i>Configurações da conta
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-question-circle me-2"></i>Central de Ajuda
+                        </a></li>
+                        
+                        <li><hr class="dropdown-divider"></li>
+                        
+                        <!-- Seção HostLink -->
+                        <li><a class="dropdown-item" href="/agenda">
+                            <i class="fas fa-calendar-alt me-2"></i>Agenda de Preços
+                        </a></li>
+                        <li><a class="dropdown-item" href="/analise">
+                            <i class="fas fa-chart-line me-2"></i>Análise Detalhada
+                        </a></li>
+                        <li><a class="dropdown-item" href="/similaridade">
+                            <i class="fas fa-search me-2"></i>Análise de Similaridade
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-exclamation-circle me-2 text-danger"></i>Monitoramento Inativo
+                        </a></li>
+                        
+                        <li><hr class="dropdown-divider"></li>
+                        
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt me-2"></i>Sair da conta
+                        </a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>
@@ -303,7 +375,8 @@
                                     {% endif %}
                                     <div class="card-body">
                                         <h6 class="card-title">{{ competitor.title[:50] }}{% if competitor.title|length > 50 %}...{% endif %}</h6>
-                                        <p class="competitor-price mb-2">R$ {{ "%.2f"|format(competitor.price_per_night) }}/noite</p>
+                                        {% set price_value = competitor.get('price_per_night', competitor.get('price', 0)) or 0 %}
+                                        <p class="competitor-price mb-2">R$ {{ "%.2f"|format(price_value) }}/noite</p>
                                         {% if competitor.rating %}
                                         <p class="mb-1">
                                             <i class="fas fa-star text-warning"></i>
@@ -393,18 +466,20 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        {% if analysis_data %}
-        // Gráfico de Preços
-        const priceCtx = document.getElementById('priceChart').getContext('2d');
-        const priceData = {
-            labels: ['Preço Original', 'Preço Sugerido', 'Média Concorrência'],
-            datasets: [{
-                label: 'Preços (R$)',
-                data: [
-                    {{ analysis_data.original_price or 0 }},
-                    {{ analysis_data.pricing_suggestion.suggested_price if analysis_data and analysis_data.pricing_suggestion else 0 }},
-                    {{ analysis_data.pricing_suggestion.reference_avg or 0 }}
-                ],
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if analysis_data %}
+            // Gráfico de Preços
+            const priceCtx = document.getElementById('priceChart');
+            if (priceCtx) {
+                const priceData = {
+                    labels: ['Preço Original', 'Preço Sugerido', 'Média Concorrência'],
+                    datasets: [{
+                        label: 'Preços (R$)',
+                        data: [
+                            {{ analysis_data.original_price or 0 }},
+                            {% if analysis_data and analysis_data.pricing_suggestion %}{{ analysis_data.pricing_suggestion.suggested_price }}{% else %}0{% endif %},
+                            {% if analysis_data and analysis_data.pricing_suggestion %}{{ analysis_data.pricing_suggestion.reference_avg or 0 }}{% else %}0{% endif %}
+                        ],
                 backgroundColor: [
                     'rgba(108, 117, 125, 0.8)',
                     'rgba(40, 167, 69, 0.8)',
@@ -419,46 +494,48 @@
             }]
         };
         
-        new Chart(priceCtx, {
-            type: 'bar',
-            data: priceData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + value.toFixed(2);
+                new Chart(priceCtx, {
+                    type: 'bar',
+                    data: priceData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value.toFixed(2);
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
                             }
                         }
                     }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                }
+                });
             }
-        });
-        {% endif %}
+            {% endif %}
 
-        {% if history %}
-        // Gráfico de Histórico
-        const historyCtx = document.getElementById('historyChart').getContext('2d');
-        const historyData = {
+            {% if history %}
+            // Gráfico de Histórico
+            const historyCtx = document.getElementById('historyChart');
+            if (historyCtx) {
+                const historyData = {
             labels: [{% for item in history[-10:] %}'{{ item.timestamp[5:10] }}'{% if not loop.last %},{% endif %}{% endfor %}],
             datasets: [{
                 label: 'Preço Sugerido (R$)',
-                data: [{% for item in history[-10:] %}{{ item.pricing_suggestion.suggested_price if item.pricing_suggestion else 0 }}{% if not loop.last %},{% endif %}{% endfor %}],
+                data: [{% for item in history[-10:] %}{% if item.pricing_suggestion %}{{ item.pricing_suggestion.suggested_price }}{% else %}0{% endif %}{% if not loop.last %},{% endif %}{% endfor %}],
                 borderColor: 'rgba(40, 167, 69, 1)',
                 backgroundColor: 'rgba(40, 167, 69, 0.1)',
                 tension: 0.4,
                 fill: true
             }, {
                 label: 'Probabilidade de Chuva (%)',
-                data: [{% for item in history[-10:] %}{{ item.weather_data[0].rain_probability if item.weather_data and item.weather_data|length > 0 else 0 }}{% if not loop.last %},{% endif %}{% endfor %}],
+                data: [{% for item in history[-10:] %}{% if item.weather_data and item.weather_data|length > 0 %}{{ item.weather_data[0].rain_probability }}{% else %}0{% endif %}{% if not loop.last %},{% endif %}{% endfor %}],
                 borderColor: 'rgba(0, 123, 255, 1)',
                 backgroundColor: 'rgba(0, 123, 255, 0.1)',
                 tension: 0.4,
@@ -466,82 +543,84 @@
             }]
         };
         
-        new Chart(historyCtx, {
-            type: 'line',
-            data: historyData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + value.toFixed(0);
+                new Chart(historyCtx, {
+                    type: 'line',
+                    data: historyData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value.toFixed(0);
+                                    }
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                },
+                                grid: {
+                                    drawOnChartArea: false,
+                                },
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top'
                             }
                         }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        max: 100,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        },
-                        grid: {
-                            drawOnChartArea: false,
-                        },
                     }
-                },
-                plugins: {
-                    legend: {
-                        position: 'top'
-                    }
-                }
+                });
             }
-        });
-        {% endif %}
+            {% endif %}
 
-        // Função para atualizar dados da internet
-         function updateDataFromInternet() {
-             const btn = document.getElementById('updateDataBtn');
-             const originalText = btn.innerHTML;
-             
-             // Mostrar loading
-             btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Atualizando...';
-             btn.disabled = true;
-             
-             // Fazer requisição para atualizar dados
-             fetch('/api/update-data', {
-                 method: 'POST',
-                 headers: {
-                     'Content-Type': 'application/json',
-                 },
-             })
-             .then(response => response.json())
-             .then(data => {
-                 if (data.success) {
-                     // Recarregar a página para mostrar os novos dados
-                     location.reload();
-                 } else {
-                     alert('Erro ao atualizar dados: ' + (data.error || 'Erro desconhecido'));
-                 }
-             })
-             .catch(error => {
-                 console.error('Erro:', error);
-                 alert('Erro ao atualizar dados. Tente novamente.');
-             })
-             .finally(() => {
-                 // Restaurar botão
-                 btn.innerHTML = originalText;
-                 btn.disabled = false;
-             });
-         }
+            // Função para atualizar dados da internet
+            window.updateDataFromInternet = function() {
+                const btn = document.getElementById('updateDataBtn');
+                const originalText = btn.innerHTML;
+                
+                // Mostrar loading
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Atualizando...';
+                btn.disabled = true;
+                
+                // Fazer requisição para atualizar dados
+                fetch('/api/update-data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Recarregar a página para mostrar os novos dados
+                        location.reload();
+                    } else {
+                        alert('Erro ao atualizar dados: ' + (data.error || 'Erro desconhecido'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao atualizar dados. Tente novamente.');
+                })
+                .finally(() => {
+                    // Restaurar botão
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                });
+            };
+        });
     </script>
 </body>
 </html>

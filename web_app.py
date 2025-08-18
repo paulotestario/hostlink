@@ -2544,6 +2544,190 @@ def check_user_reservation(listing_id):
             'error': str(e)
         }), 500
 
+# ===== ROTAS DE NOTIFICAÇÕES =====
+
+@app.route('/api/notifications', methods=['GET'])
+@login_required
+def get_notifications():
+    """Buscar notificações do usuário"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não autenticado'
+            }), 401
+        
+        notifications = db.get_user_notifications(user_db_id)
+        
+        return jsonify({
+            'success': True,
+            'notifications': notifications
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar notificações: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/notifications/<int:notification_id>/read', methods=['POST'])
+@login_required
+def mark_notification_read(notification_id):
+    """Marcar notificação como lida"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não autenticado'
+            }), 401
+        
+        success = db.mark_notification_as_read(notification_id, user_db_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Notificação marcada como lida'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Notificação não encontrada ou não pertence ao usuário'
+            }), 404
+        
+    except Exception as e:
+        print(f"❌ Erro ao marcar notificação como lida: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/notifications/mark-all-read', methods=['POST'])
+@login_required
+def mark_all_notifications_read():
+    """Marcar todas as notificações como lidas"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não autenticado'
+            }), 401
+        
+        count = db.mark_all_notifications_as_read(user_db_id)
+        
+        return jsonify({
+            'success': True,
+            'message': f'{count} notificações marcadas como lidas'
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao marcar todas as notificações como lidas: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/notifications/unread-count', methods=['GET'])
+@login_required
+def get_unread_notifications_count():
+    """Obter contagem de notificações não lidas"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não autenticado'
+            }), 401
+        
+        count = db.get_unread_notifications_count(user_db_id)
+        
+        return jsonify({
+            'success': True,
+            'count': count
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar contagem de notificações: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/notifications/<int:notification_id>/details', methods=['GET'])
+@login_required
+def get_notification_details(notification_id):
+    """Buscar detalhes completos de uma notificação específica"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não autenticado'
+            }), 401
+        
+        # Buscar a notificação
+        notification_result = db.supabase.table('notifications').select(
+            '*, listing_bookings(*, user_listings(title, address, image_url), users!guest_user_id(name, email))'
+        ).eq('id', notification_id).eq('user_id', user_db_id).execute()
+        
+        if not notification_result.data:
+            return jsonify({
+                'success': False,
+                'error': 'Notificação não encontrada'
+            }), 404
+        
+        notification = notification_result.data[0]
+        
+        # Preparar dados da resposta
+        response_data = {
+            'notification': {
+                'id': notification['id'],
+                'type': notification['type'],
+                'title': notification['title'],
+                'message': notification['message'],
+                'is_read': notification['is_read'],
+                'created_at': notification['created_at']
+            }
+        }
+        
+        # Adicionar detalhes da reserva se existir
+        if notification.get('listing_bookings'):
+            booking = notification['listing_bookings']
+            listing = booking.get('user_listings', {})
+            guest = booking.get('users', {})
+            
+            response_data['booking'] = {
+                'id': booking['id'],
+                'checkin_date': booking['checkin_date'],
+                'checkout_date': booking['checkout_date'],
+                'total_price': booking.get('total_price'),
+                'status': booking['status'],
+                'payment_status': booking.get('payment_status'),
+                'guest_name': guest.get('name') or booking.get('guest_name'),
+                'guest_email': guest.get('email') or booking.get('guest_email'),
+                'guest_phone': booking.get('guest_phone'),
+                'listing': {
+                    'title': listing.get('title'),
+                    'address': listing.get('address'),
+                    'image_url': listing.get('image_url')
+                }
+            }
+        
+        return jsonify({
+            'success': True,
+            'data': response_data
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar detalhes da notificação: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/anuncios/reservar-autenticado', methods=['POST'])
 @login_required
 def create_authenticated_booking():

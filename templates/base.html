@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HostLink{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='hostlink-theme.css') }}">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold text-primary" href="{{ url_for('index') }}">
+                <i class="fas fa-home me-2"></i>HostLink
+            </a>
+            
+            <div class="navbar-nav ms-auto">
+                {% if current_user.is_authenticated %}
+                    <!-- Notifications -->
+                    <div class="nav-item dropdown me-3">
+                        <a class="nav-link position-relative" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-bell" style="font-size: 1.2rem;"></i>
+                            <span id="notificationBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none;">0</span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="width: 350px; max-height: 400px; overflow-y: auto;">
+                            <div class="dropdown-header d-flex justify-content-between align-items-center">
+                                <span><i class="fas fa-bell me-2"></i>Notificações</span>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="markAllNotificationsAsRead()" style="font-size: 0.75rem;">Marcar todas como lidas</button>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <div id="notificationsList">
+                                <div class="dropdown-item-text text-center text-muted py-3">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>Carregando...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Modal de Detalhes da Notificação -->
+                    <div class="modal fade" id="notificationModal" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Detalhes da Notificação</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body" id="notificationModalBody">
+                                    <div class="text-center py-3">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>Carregando...
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- User Menu -->
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            {% if current_user.profile_pic %}
+                                <img src="{{ current_user.profile_pic }}" alt="{{ current_user.name }}" class="rounded-circle me-2" width="32" height="32">
+                            {% else %}
+                                <i class="fas fa-user-circle me-2" style="font-size: 1.5rem;"></i>
+                            {% endif %}
+                            {{ current_user.name }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><div class="dropdown-item-text text-muted small">{{ current_user.email }}</div></li>
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Seção Vou hospedar -->
+                            <li><h6 class="dropdown-header"><i class="fas fa-home me-2"></i>Vou hospedar</h6></li>
+                            <li><a class="dropdown-item" href="{{ url_for('hosting') }}"><i class="fas fa-cog me-2"></i>Gerir meu anúncio</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}"><i class="fas fa-calendar-check me-2"></i>Reservas</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('anuncios_publicos') }}"><i class="fas fa-list me-2"></i>Anúncios</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Seção Vou Viajar -->
+                            <li><h6 class="dropdown-header"><i class="fas fa-suitcase me-2"></i>Vou Viajar</h6></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-suitcase me-2"></i>Viagens</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}"><i class="fas fa-calendar-check me-2"></i>Minhas Reservas</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-comments me-2"></i>Mensagens</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('anuncios_publicos') }}"><i class="fas fa-list me-2"></i>Anúncios Públicos</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Seção Ferramentas Airbnb -->
+                            <li><h6 class="dropdown-header"><i class="fas fa-tools me-2"></i>Ferramentas Airbnb</h6></li>
+                            <li><a class="dropdown-item" href="{{ url_for('agenda') }}"><i class="fas fa-calendar-alt me-2"></i>Agenda de Preços</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('analise') }}"><i class="fas fa-chart-line me-2"></i>Análise Detalhada</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('similaridade') }}"><i class="fas fa-search me-2"></i>Análise de Similaridade</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('favoritos') }}"><i class="fas fa-heart me-2"></i>Favoritos</a></li>
+                            <li><a class="dropdown-item text-muted" href="#"><i class="fas fa-exclamation-triangle me-2"></i>Monitoramento Inativo</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            
+                            <!-- Seção Minha Conta -->
+                            <li><h6 class="dropdown-header"><i class="fas fa-user me-2"></i>Minha Conta</h6></li>
+                            <li><a class="dropdown-item" href="{{ url_for('perfil') }}"><i class="fas fa-user me-2"></i>Perfil</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Configurações da conta</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-question-circle me-2"></i>Central de Ajuda</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Sair da conta</a></li>
+                        </ul>
+                    </div>
+                {% else %}
+                    <!-- Guest Menu -->
+                    <a class="btn btn-outline-primary me-2" href="{{ url_for('login') }}">Entrar</a>
+                    <a class="btn btn-primary" href="{{ url_for('anuncios_publicos') }}">Anúncios Públicos</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Notifications and Dropdown Script -->
+    <script>
+        let notificationsLoaded = false;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Ensure dropdown functionality
+            var dropdownElementList = [].slice.call(document.querySelectorAll('[data-bs-toggle="dropdown"]'));
+            var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
+                return new bootstrap.Dropdown(dropdownToggleEl);
+            });
+            
+            console.log('Bootstrap dropdowns initialized:', dropdownList.length);
+            console.log('Dropdown elements found:', dropdownElementList);
+            
+            // Force click event for dropdown toggle
+            const dropdownToggle = document.getElementById('navbarDropdown');
+            if (dropdownToggle) {
+                dropdownToggle.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Dropdown clicked manually');
+                    const dropdown = bootstrap.Dropdown.getInstance(dropdownToggle) || new bootstrap.Dropdown(dropdownToggle);
+                    dropdown.toggle();
+                });
+                console.log('Manual click handler added to dropdown');
+            }
+            
+            // Initialize notifications
+            {% if current_user.is_authenticated %}
+                loadNotifications();
+                
+                // Load notifications when dropdown is opened
+                const notificationsDropdown = document.getElementById('notificationsDropdown');
+                if (notificationsDropdown) {
+                    notificationsDropdown.addEventListener('click', function() {
+                        if (!notificationsLoaded) {
+                            loadNotifications();
+                        }
+                    });
+                }
+                
+                // Refresh notifications every 30 seconds
+                setInterval(loadNotifications, 30000);
+            {% endif %}
+        });
+        
+        // Global function for notification details (must be outside auth block)
+
+        
+        {% if current_user.is_authenticated %}
+        function loadNotifications() {
+            fetch('/api/notifications')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayNotifications(data.notifications);
+                        updateNotificationBadge(data.notifications);
+                        notificationsLoaded = true;
+                    } else {
+                        console.error('Erro ao carregar notificações:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar notificações:', error);
+                    document.getElementById('notificationsList').innerHTML = `
+                        <div class="dropdown-item-text text-center text-muted py-3">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Erro ao carregar notificações
+                        </div>
+                    `;
+                });
+        }
+        
+        function displayNotifications(notifications) {
+            const notificationsList = document.getElementById('notificationsList');
+            
+            if (notifications.length === 0) {
+                notificationsList.innerHTML = `
+                    <div class="dropdown-item-text text-center text-muted py-3">
+                        <i class="fas fa-check-circle me-2"></i>Nenhuma notificação
+                    </div>
+                `;
+                return;
+            }
+            
+            notificationsList.innerHTML = notifications.map(notification => {
+                const isUnread = !notification.is_read;
+                const createdAt = new Date(notification.created_at).toLocaleString('pt-BR');
+                
+                return `
+                    <div class="dropdown-item ${isUnread ? 'bg-light' : ''}" style="white-space: normal; cursor: pointer;" onclick="showNotificationDetails(${notification.id})">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="fw-bold text-primary mb-1">${notification.title}</div>
+                                <div class="text-muted small mb-1">${notification.message}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <i class="fas fa-clock me-1"></i>${createdAt}
+                                </div>
+                            </div>
+                            ${isUnread ? '<div class="ms-2"><span class="badge bg-primary rounded-pill">Nova</span></div>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function updateNotificationBadge(notifications) {
+            const unreadCount = notifications.filter(n => !n.is_read).length;
+            const badge = document.getElementById('notificationBadge');
+            
+            if (unreadCount > 0) {
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        
+        function markNotificationAsRead(notificationId) {
+            fetch(`/api/notifications/${notificationId}/read`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadNotifications(); // Reload to update display
+                } else {
+                    console.error('Erro ao marcar notificação como lida:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao marcar notificação como lida:', error);
+            });
+        }
+        
+        function showNotificationDetails(notificationId) {
+            console.log('🔔 showNotificationDetails called with ID:', notificationId);
+            
+            // Verificar se o modal existe
+            const modalElement = document.getElementById('notificationModal');
+            console.log('🔍 Modal element found:', modalElement);
+            
+            if (!modalElement) {
+                console.error('❌ Modal notificationModal não encontrado!');
+                alert('Erro: Modal não encontrado!');
+                return;
+            }
+            
+            console.log('✅ Modal element exists, proceeding...');
+            
+            // Verificar se Bootstrap está carregado
+            if (typeof bootstrap === 'undefined') {
+                console.error('❌ Bootstrap não está carregado!');
+                alert('Erro: Bootstrap não carregado!');
+                return;
+            }
+            
+            console.log('✅ Bootstrap is loaded');
+            
+            // Fechar dropdown de notificações
+            const dropdownElement = document.getElementById('notificationsDropdown');
+            console.log('🔍 Dropdown element:', dropdownElement);
+            
+            const dropdown = bootstrap.Dropdown.getInstance(dropdownElement);
+            console.log('🔍 Dropdown instance:', dropdown);
+            
+            if (dropdown) {
+                console.log('🔽 Hiding dropdown...');
+                dropdown.hide();
+            }
+            
+            // Mostrar modal com loading
+            console.log('🚀 Creating modal instance...');
+            try {
+                const modal = new bootstrap.Modal(modalElement);
+                console.log('✅ Modal instance created:', modal);
+                
+                console.log('📱 Showing modal...');
+                modal.show();
+                console.log('✅ Modal.show() called successfully');
+            } catch (error) {
+                console.error('❌ Error creating/showing modal:', error);
+                alert('Erro ao abrir modal: ' + error.message);
+                return;
+            }
+            
+            // Buscar detalhes da notificação
+            fetch(`/api/notifications/${notificationId}/details`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayNotificationDetails(data.data);
+                        // Marcar como lida automaticamente
+                        markNotificationAsRead(notificationId, false); // false = não recarregar
+                    } else {
+                        document.getElementById('notificationModalBody').innerHTML = `
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Erro ao carregar detalhes: ${data.error}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar detalhes da notificação:', error);
+                    document.getElementById('notificationModalBody').innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Erro ao carregar detalhes da notificação
+                        </div>
+                    `;
+                });
+        }
+        
+        function displayNotificationDetails(data) {
+            const notification = data.notification;
+            const booking = data.booking;
+            const createdAt = new Date(notification.created_at).toLocaleString('pt-BR');
+            
+            let content = `
+                <div class="notification-details">
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-2">
+                            <i class="fas fa-bell me-2"></i>${notification.title}
+                        </h6>
+                        <p class="mb-2">${notification.message}</p>
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>Recebida em ${createdAt}
+                        </small>
+                    </div>
+            `;
+            
+            if (booking) {
+                const checkinDate = new Date(booking.checkin_date).toLocaleDateString('pt-BR');
+                const checkoutDate = new Date(booking.checkout_date).toLocaleDateString('pt-BR');
+                const totalPrice = booking.total_price ? `R$ ${parseFloat(booking.total_price).toFixed(2)}` : 'Não informado';
+                
+                content += `
+                    <div class="border-top pt-4">
+                        <h6 class="text-success mb-3">
+                            <i class="fas fa-calendar-check me-2"></i>Detalhes da Reserva
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-primary">
+                                            <i class="fas fa-home me-2"></i>Propriedade
+                                        </h6>
+                                        <p class="card-text mb-1"><strong>${booking.listing.title || 'Título não disponível'}</strong></p>
+                                        ${booking.listing.address ? `<small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${booking.listing.address}</small>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-info">
+                                            <i class="fas fa-user me-2"></i>Hóspede
+                                        </h6>
+                                        <p class="card-text mb-1"><strong>${booking.guest_name}</strong></p>
+                                        <small class="text-muted">
+                                            <i class="fas fa-envelope me-1"></i>${booking.guest_email || 'Email não disponível'}
+                                        </small>
+                                        ${booking.guest_phone ? `<br><small class="text-muted"><i class="fas fa-phone me-1"></i>${booking.guest_phone}</small>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <i class="fas fa-calendar-alt text-success mb-2" style="font-size: 1.5rem;"></i>
+                                    <h6 class="mb-1">Check-in</h6>
+                                    <strong>${checkinDate}</strong>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <i class="fas fa-calendar-alt text-warning mb-2" style="font-size: 1.5rem;"></i>
+                                    <h6 class="mb-1">Check-out</h6>
+                                    <strong>${checkoutDate}</strong>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <i class="fas fa-dollar-sign text-primary mb-2" style="font-size: 1.5rem;"></i>
+                                    <h6 class="mb-1">Valor Total</h6>
+                                    <strong>${totalPrice}</strong>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="text-center p-2 rounded" style="background-color: ${booking.status === 'confirmed' ? '#d4edda' : booking.status === 'pending' ? '#fff3cd' : '#f8d7da'}">
+                                    <small class="text-muted">Status da Reserva</small><br>
+                                    <strong class="text-${booking.status === 'confirmed' ? 'success' : booking.status === 'pending' ? 'warning' : 'danger'}">
+                                        ${booking.status === 'confirmed' ? 'Confirmada' : booking.status === 'pending' ? 'Pendente' : 'Cancelada'}
+                                    </strong>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="text-center p-2 rounded" style="background-color: ${booking.payment_status === 'paid' ? '#d4edda' : '#fff3cd'}">
+                                    <small class="text-muted">Status do Pagamento</small><br>
+                                    <strong class="text-${booking.payment_status === 'paid' ? 'success' : 'warning'}">
+                                        ${booking.payment_status === 'paid' ? 'Pago' : 'Pendente'}
+                                    </strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            content += '</div>';
+            
+            document.getElementById('notificationModalBody').innerHTML = content;
+        }
+        
+        function markNotificationAsRead(notificationId, shouldReload = true) {
+            fetch(`/api/notifications/${notificationId}/read`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && shouldReload) {
+                    loadNotifications(); // Reload to update display
+                } else if (!data.success) {
+                    console.error('Erro ao marcar notificação como lida:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao marcar notificação como lida:', error);
+            });
+        }
+        
+        function markAllNotificationsAsRead() {
+            fetch('/api/notifications/mark-all-read', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadNotifications(); // Reload to update display
+                } else {
+                    console.error('Erro ao marcar todas as notificações como lidas:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao marcar todas as notificações como lidas:', error);
+            });
+        }
+        {% endif %}
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

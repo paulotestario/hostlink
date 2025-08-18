@@ -1,13 +1,9 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ listing.title }} - HostLink</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='hostlink-theme.css') }}" rel="stylesheet">
-    <style>
+{% extends "base.html" %}
+
+{% block title %}{{ listing.title }} - HostLink{% endblock %}
+
+{% block extra_css %}
+<style>
         body {
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
@@ -264,54 +260,10 @@
                  font-size: 1.5rem;
              }
          }
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
-                <i class="fas fa-home text-primary me-2"></i>HostLink
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                {% if user_logged_in %}
-                    <div class="dropdown">
-                        <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <img src="{{ user_info.picture or '/static/placeholder.svg' }}" 
-                                 alt="{{ user_info.name }}" 
-                                 class="rounded-circle me-2" 
-                                 style="width: 32px; height: 32px; object-fit: cover;">
-                            {{ user_info.name }}
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><div class="dropdown-item-text text-muted small">{{ user_info.email }}</div></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('favoritos') }}"><i class="fas fa-heart me-2"></i>Favoritos</a></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-suitcase me-2"></i>Viagens</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}"><i class="fas fa-calendar-check me-2"></i>Minhas Reservas</a></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-comments me-2"></i>Mensagens</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('perfil') }}"><i class="fas fa-user me-2"></i>Perfil</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-bell me-2"></i>Notificações <span class="badge bg-danger ms-2">1</span></a></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Configurações da conta</a></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-question-circle me-2"></i>Central de Ajuda</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('agenda') }}"><i class="fas fa-calendar-alt me-2"></i>Agenda de Preços</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('analise') }}"><i class="fas fa-chart-line me-2"></i>Análise Detalhada</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('similaridade') }}"><i class="fas fa-search me-2"></i>Análise de Similaridade</a></li>
-                            <li><a class="dropdown-item text-muted" href="#"><i class="fas fa-exclamation-triangle me-2"></i>Monitoramento Inativo</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Sair da conta</a></li>
-                        </ul>
-                    </div>
-                {% else %}
-                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary me-2">Entrar</a>
-                    <a href="{{ url_for('anuncios_publicos') }}" class="btn btn-primary">Ver Anúncios</a>
-                {% endif %}
-            </div>
-        </div>
-    </nav>
+</style>
+{% endblock %}
+
+{% block content %}
 
     <!-- Hero Section -->
     <section class="listing-hero">
@@ -700,5 +652,4 @@
             });
         });
     </script>
-</body>
-</html>
+{% endblock %}

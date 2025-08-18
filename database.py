@@ -686,7 +686,13 @@ class HostLinkDatabase:
                 data['booking_notes'] = booking_notes
             
             result = self.supabase.table('listing_bookings').insert(data).execute()
-            return result.data[0]['id'] if result.data else None
+            booking_id = result.data[0]['id'] if result.data else None
+            
+            # Criar notificação para o host
+            if booking_id:
+                self.create_booking_notification(booking_id)
+            
+            return booking_id
         except Exception as e:
             print(f"❌ Erro ao salvar reserva: {e}")
             return None
@@ -1009,7 +1015,10 @@ class HostLinkDatabase:
             result = self.supabase.table('listing_bookings').insert(booking_data).execute()
             
             if result.data:
-                return result.data[0]['id']
+                booking_id = result.data[0]['id']
+                # Criar notificação automática para o anfitrião
+                self.create_booking_notification(booking_id)
+                return booking_id
             return None
         except Exception as e:
             print(f"❌ Erro ao criar reserva pública: {e}")
@@ -1058,8 +1067,13 @@ class HostLinkDatabase:
             result = self.supabase.table('listing_bookings').insert(booking_data).execute()
             
             if result.data:
-                print(f"✅ Reserva autenticada criada com ID: {result.data[0]['id']} para usuário {guest_user_id}")
-                return result.data[0]['id']
+                booking_id = result.data[0]['id']
+                print(f"✅ Reserva autenticada criada com ID: {booking_id} para usuário {guest_user_id}")
+                
+                # Criar notificação para o host
+                self.create_booking_notification(booking_id)
+                
+                return booking_id
             return None
         except Exception as e:
             print(f"❌ Erro ao criar reserva autenticada: {e}")
@@ -1292,6 +1306,167 @@ class HostLinkDatabase:
             except Exception as e2:
                 print(f"❌ Erro no fallback para anúncios mais favoritados: {e2}")
                 return []
+
+    # ===== FUNÇÕES DE NOTIFICAÇÕES =====
+    
+    def create_notification(self, user_id: int, notification_type: str, title: str, message: str,
+                          related_booking_id: int = None, related_listing_id: int = None) -> int:
+        """
+        Cria uma nova notificação para o usuário
+        """
+        try:
+            notification_data = {
+                'user_id': user_id,
+                'type': notification_type,
+                'title': title,
+                'message': message,
+                'related_booking_id': related_booking_id,
+                'related_listing_id': related_listing_id,
+                'is_read': False,
+                'created_at': datetime.now().isoformat()
+            }
+            
+            result = self.supabase.table('notifications').insert(notification_data).execute()
+            
+            if result.data:
+                print(f"✅ Notificação criada com ID: {result.data[0]['id']} para usuário {user_id}")
+                return result.data[0]['id']
+            return None
+        except Exception as e:
+            print(f"❌ Erro ao criar notificação: {e}")
+            return None
+    
+    def get_user_notifications(self, user_id: int, unread_only: bool = False, limit: int = 50) -> List[Dict]:
+        """
+        Busca notificações do usuário
+        """
+        try:
+            query = self.supabase.table('notifications').select(
+                '*, listing_bookings(guest_name, checkin_date, checkout_date), user_listings(title)'
+            ).eq('user_id', user_id)
+            
+            if unread_only:
+                query = query.eq('is_read', False)
+            
+            result = query.order('created_at', desc=True).limit(limit).execute()
+            return result.data
+        except Exception as e:
+            print(f"❌ Erro ao buscar notificações: {e}")
+            return []
+    
+    def mark_notification_as_read(self, notification_id: int, user_id: int = None) -> bool:
+        """
+        Marca uma notificação como lida
+        """
+        try:
+            update_data = {
+                'is_read': True,
+                'read_at': datetime.now().isoformat()
+            }
+            
+            query = self.supabase.table('notifications').update(update_data).eq('id', notification_id)
+            
+            if user_id:
+                query = query.eq('user_id', user_id)
+            
+            result = query.execute()
+            
+            if result.data:
+                print(f"✅ Notificação {notification_id} marcada como lida")
+                return True
+            return False
+        except Exception as e:
+            print(f"❌ Erro ao marcar notificação como lida: {e}")
+            return False
+    
+    def mark_all_notifications_as_read(self, user_id: int) -> bool:
+        """
+        Marca todas as notificações do usuário como lidas
+        """
+        try:
+            update_data = {
+                'is_read': True,
+                'read_at': datetime.now().isoformat()
+            }
+            
+            result = self.supabase.table('notifications').update(update_data).eq('user_id', user_id).eq('is_read', False).execute()
+            
+            if result.data:
+                print(f"✅ Todas as notificações do usuário {user_id} marcadas como lidas")
+                return True
+            return False
+        except Exception as e:
+            print(f"❌ Erro ao marcar todas as notificações como lidas: {e}")
+            return False
+    
+    def get_unread_notifications_count(self, user_id: int) -> int:
+        """
+        Retorna o número de notificações não lidas do usuário
+        """
+        try:
+            result = self.supabase.table('notifications').select('id', count='exact').eq('user_id', user_id).eq('is_read', False).execute()
+            return result.count if result.count else 0
+        except Exception as e:
+            print(f"❌ Erro ao contar notificações não lidas: {e}")
+            return 0
+    
+    def create_booking_notification(self, booking_id: int) -> bool:
+        """
+        Cria notificação automática quando uma nova reserva é feita
+        """
+        try:
+            # Buscar dados da reserva
+            booking_result = self.supabase.table('listing_bookings').select(
+                '*, user_listings(title, user_id), users!guest_user_id(name)'
+            ).eq('id', booking_id).execute()
+            
+            if not booking_result.data:
+                print(f"❌ Reserva {booking_id} não encontrada")
+                return False
+            
+            booking = booking_result.data[0]
+            host_user_id = booking['user_listings']['user_id']
+            guest_name = booking['users']['name'] if booking['users'] else booking['guest_name']
+            listing_title = booking['user_listings']['title']
+            checkin_date = booking['checkin_date']
+            checkout_date = booking['checkout_date']
+            
+            # Criar notificação para o anfitrião
+            title = "Nova Reserva Recebida!"
+            message = f"Uma nova reserva de {guest_name} no anúncio '{listing_title}' do dia {checkin_date} até o dia {checkout_date}."
+            
+            return self.create_notification(
+                user_id=host_user_id,
+                notification_type='new_booking',
+                title=title,
+                message=message,
+                related_booking_id=booking_id,
+                related_listing_id=booking['listing_id']
+            ) is not None
+            
+        except Exception as e:
+            print(f"❌ Erro ao criar notificação de reserva: {e}")
+            return False
+    
+    def delete_notification(self, notification_id: int, user_id: int = None) -> bool:
+        """
+        Deleta uma notificação
+        """
+        try:
+            query = self.supabase.table('notifications').delete().eq('id', notification_id)
+            
+            if user_id:
+                query = query.eq('user_id', user_id)
+            
+            result = query.execute()
+            
+            if result.data:
+                print(f"✅ Notificação {notification_id} deletada")
+                return True
+            return False
+        except Exception as e:
+            print(f"❌ Erro ao deletar notificação: {e}")
+            return False
 
     def test_connection(self) -> bool:
         """

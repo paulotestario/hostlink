@@ -1,13 +1,9 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minhas Reservas - HostLink</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='hostlink-theme.css') }}">
-    <style>
+{% extends "base.html" %}
+
+{% block title %}Minhas Reservas - HostLink{% endblock %}
+
+{% block extra_css %}
+<style>
         .reservas-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -198,67 +194,11 @@
             font-weight: bold;
             font-size: 1.1rem;
         }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Header HostLink -->
-        <nav class="navbar navbar-expand-lg navbar-light">
-            <div class="container">
-                <a class="navbar-brand" href="{{ url_for('index') }}">
-                    <i class="fas fa-handshake me-2" style="color: #00A699;"></i>
-                    HOSTLINK
-                </a>
-                <div class="navbar-nav ms-auto">
-                    <a class="nav-link" href="{{ url_for('agenda') }}">
-                        <i class="fas fa-calendar-alt me-2"></i>Agenda de Preços
-                    </a>
-                    <a class="nav-link" href="{{ url_for('analise') }}">
-                        <i class="fas fa-chart-line me-2"></i>Análise Detalhada
-                    </a>
-                    <a class="nav-link" href="{{ url_for('similaridade') }}">
-                        <i class="fas fa-search me-2"></i>Análise de Similaridade
-                    </a>
-                    <a class="nav-link" href="{{ url_for('hosting') }}">
-                        <i class="fas fa-home me-2"></i>Hospedar
-                    </a>
-                    
-                    <!-- Informações do usuário -->
-                    {% if current_user %}
-                    <div class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            {% if current_user.picture %}
-                                <img src="{{ current_user.picture }}" alt="{{ current_user.name }}" class="rounded-circle me-2" width="32" height="32">
-                            {% else %}
-                                <i class="fas fa-user-circle me-2" style="font-size: 1.5rem;"></i>
-                            {% endif %}
-                            {{ current_user.name }}
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><span class="dropdown-item-text text-muted">{{ current_user.email }}</span></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('favoritos') }}"><i class="fas fa-heart me-2"></i>Favoritos</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('viagens') }}"><i class="fas fa-suitcase me-2"></i>Viagens</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}"><i class="fas fa-calendar-check me-2"></i>Minhas Reservas</a></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-comments me-2"></i>Mensagens</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('perfil') }}"><i class="fas fa-user me-2"></i>Perfil</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-bell me-2"></i>Notificações <span class="badge bg-danger">1</span></a></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Configurações da conta</a></li>
-                            <li><a class="dropdown-item" href="#"><i class="fas fa-question-circle me-2"></i>Central de Ajuda</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('agenda') }}"><i class="fas fa-calendar-alt me-2"></i>Agenda de Preços</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('analise') }}"><i class="fas fa-chart-line me-2"></i>Análise Detalhada</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('similaridade') }}"><i class="fas fa-search me-2"></i>Análise de Similaridade</a></li>
-                            <li><a class="dropdown-item text-muted" href="#"><i class="fas fa-exclamation-triangle me-2"></i>Monitoramento Inativo</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Sair da conta</a></li>
-                        </ul>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </nav>
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
 
         <!-- Cabeçalho -->
         <div class="reservas-header">
@@ -397,5 +337,5 @@
             }
         }
     </script>
-</body>
-</html>
+</div>
+{% endblock %}

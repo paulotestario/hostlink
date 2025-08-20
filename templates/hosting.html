@@ -1055,39 +1055,66 @@
         
         // Salvar disponibilidade
         function saveAvailability() {
+            console.log('=== SAVE AVAILABILITY FUNCTION STARTED ===');
+            
             const startDate = document.getElementById('availabilityStartDate').value;
             const endDate = document.getElementById('availabilityEndDate').value;
             const pricePerNight = document.getElementById('availabilityPrice').value;
             
+            console.log('Form values:');
+            console.log('- Start Date:', startDate);
+            console.log('- End Date:', endDate);
+            console.log('- Price Per Night:', pricePerNight);
+            console.log('- Current Listing ID:', currentListingId);
+            
             if (!startDate || !endDate || !pricePerNight) {
+                console.error('Validation failed: missing required fields');
                 alert('Todos os campos são obrigatórios');
                 return;
             }
+            
+            if (!currentListingId) {
+                console.error('Validation failed: currentListingId is null or undefined');
+                alert('Erro: ID do anúncio não encontrado. Por favor, feche e abra a agenda novamente.');
+                return;
+            }
+            
+            const requestData = {
+                listing_id: currentListingId,
+                start_date: startDate,
+                end_date: endDate,
+                price_per_night: parseFloat(pricePerNight)
+            };
+            
+            console.log('Request data:', requestData);
+            console.log('Sending POST request to /api/agenda/availability');
             
             fetch('/api/agenda/availability', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    listing_id: currentListingId,
-                    start_date: startDate,
-                    end_date: endDate,
-                    price_per_night: parseFloat(pricePerNight)
-                })
+                body: JSON.stringify(requestData)
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+                return response.json();
+            })
             .then(data => {
+                console.log('Response data:', data);
                 if (data.success) {
+                    console.log('Success: Availability saved successfully');
                     alert('Disponibilidade salva com sucesso!');
                     bootstrap.Modal.getInstance(document.getElementById('availabilityModal')).hide();
                     loadAvailability(currentListingId);
                 } else {
+                    console.error('Server error:', data.error);
                     alert('Erro ao salvar disponibilidade: ' + data.error);
                 }
             })
             .catch(error => {
-                console.error('Erro:', error);
+                console.error('Fetch error:', error);
                 alert('Erro ao salvar disponibilidade.');
             });
         }
@@ -1190,6 +1217,10 @@
                                     `<button class="btn btn-outline-danger btn-sm" onclick="cancelHostReservation(${booking.id}, '${booking.guest_name || 'Hóspede'}')" title="Cancelar Reserva">
                                         <i class="fas fa-times"></i>
                                     </button>` : ''}
+                                ${(booking.status === 'confirmed' && new Date(booking.checkout_date) < new Date()) ? 
+                                    `<button class="btn btn-outline-primary btn-sm" onclick="completeHostReservation(${booking.id}, '${booking.guest_name || 'Hóspede'}')" title="Marcar como Concluída">
+                                        <i class="fas fa-flag-checkered"></i>
+                                    </button>` : ''}
                             </div>
                         </div>
                     </div>
@@ -1275,7 +1306,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" onclick="saveAvailability()">
+                    <button type="button" class="btn btn-primary" onclick="event.preventDefault(); saveAvailability(); return false;">
                         <i class="fas fa-save me-2"></i>Salvar
                     </button>
                 </div>
@@ -1334,6 +1365,33 @@
                 .catch(error => {
                     console.error('Erro:', error);
                     alert('Erro ao cancelar reserva');
+                });
+            }
+        }
+        
+        function completeHostReservation(bookingId, guestName) {
+            if (confirm(`Tem certeza que deseja marcar a reserva de ${guestName} como concluída?`)) {
+                fetch(`/api/complete-booking/${bookingId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Reserva marcada como concluída com sucesso!');
+                        // Recarregar as reservas
+                        if (currentListingId) {
+                            loadRecentBookings(currentListingId);
+                        }
+                    } else {
+                        alert('Erro ao marcar reserva como concluída: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao marcar reserva como concluída');
                 });
             }
         }

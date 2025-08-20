@@ -419,6 +419,109 @@ class HostLinkDatabase:
             print(f"❌ Erro ao buscar usuário: {e}")
             return None
     
+    def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """
+        Busca usuário pelo email
+        """
+        try:
+            result = self.supabase.table('users').select('*').eq('email', email).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            print(f"❌ Erro ao buscar usuário por email: {e}")
+            return None
+    
+    def check_email_auth_type(self, email: str) -> Optional[str]:
+        """
+        Verifica o tipo de autenticação usado por um email
+        Retorna 'google', 'email' ou None se não encontrado
+        """
+        try:
+            result = self.supabase.table('users').select('auth_type, google_id').eq('email', email).execute()
+            if result.data:
+                user = result.data[0]
+                # Se tem google_id preenchido, é autenticação Google
+                if user.get('google_id'):
+                    return 'google'
+                # Se tem auth_type definido, usa esse valor
+                elif user.get('auth_type'):
+                    return user['auth_type']
+                # Fallback: se não tem auth_type mas tem google_id, é Google
+                else:
+                    return 'google' if user.get('google_id') else 'email'
+            return None
+        except Exception as e:
+            print(f"❌ Erro ao verificar tipo de autenticação: {e}")
+            return None
+    
+    def create_email_user(self, email: str, name: str, password_hash: str, verification_token: str) -> int:
+        """
+        Cria usuário com autenticação por email
+        """
+        try:
+            result = self.supabase.table('users').insert({
+                'email': email,
+                'name': name,
+                'password_hash': password_hash,
+                'auth_type': 'email',
+                'profile_pic': ''
+            }).execute()
+            return result.data[0]['id'] if result.data else None
+        except Exception as e:
+            print(f"❌ Erro ao criar usuário por email: {e}")
+            return None
+    
+    def authenticate_email_user(self, email: str, password: str) -> Optional[Dict]:
+        """
+        Autentica usuário por email e senha
+        """
+        try:
+            from werkzeug.security import check_password_hash
+            
+            # Buscar usuário por email
+            result = self.supabase.table('users').select('*').eq('email', email).eq('auth_type', 'email').execute()
+            
+            if result.data:
+                user = result.data[0]
+                # Verificar senha
+                if check_password_hash(user['password_hash'], password):
+                    return user
+            
+            return None
+        except Exception as e:
+            print(f"❌ Erro na autenticação por email: {e}")
+            return None
+    
+    def update_user_password(self, user_id: int, new_password_hash: str) -> bool:
+        """
+        Atualiza senha do usuário
+        """
+        try:
+            result = self.supabase.table('users').update({
+                'password_hash': new_password_hash,
+                'reset_token': None,
+                'reset_token_expires': None,
+                'updated_at': datetime.now().isoformat()
+            }).eq('id', user_id).execute()
+            return bool(result.data)
+        except Exception as e:
+            print(f"❌ Erro ao atualizar senha: {e}")
+            return False
+    
+    def verify_email(self, verification_token: str) -> bool:
+        """
+        Verifica email do usuário
+        """
+        try:
+            result = self.supabase.table('users').update({
+                'email_verified': True,
+                'verification_token': None,
+                'updated_at': datetime.now().isoformat()
+            }).eq('verification_token', verification_token).execute()
+            return bool(result.data)
+        except Exception as e:
+            print(f"❌ Erro ao verificar email: {e}")
+            return False
+    
     def save_user_listing(self, user_id: int, title: str, url: str, municipio_id: int = None,
                          platform: str = 'airbnb', property_type: str = None, 
                          max_guests: int = None, bedrooms: int = None, bathrooms: int = None,
@@ -433,12 +536,12 @@ class HostLinkDatabase:
                          host_name: str = None, host_id: str = None, 
                          host_response_rate: int = None, host_response_time: str = None,
                          extraction_method: str = None, data_quality_score: float = None,
-                         last_scraped: str = None) -> int:
+                         last_scraped: str = None, is_active: bool = True) -> int:
         """
         Salva um link de anúncio do usuário usando apenas campos que existem na tabela
         """
         try:
-            # Usar apenas campos que existem na estrutura básica da tabela
+            # Usar todos os campos que existem na tabela user_listings
             listing_data = {
                 'user_id': user_id,
                 'title': title,
@@ -448,7 +551,34 @@ class HostLinkDatabase:
                 'property_type': property_type,
                 'max_guests': max_guests,
                 'bedrooms': bedrooms,
-                'bathrooms': bathrooms
+                'bathrooms': bathrooms,
+                'is_active': is_active,
+                'price_per_night': price_per_night,
+                'rating': rating,
+                'reviews': reviews,
+                'address': address,
+                'latitude': latitude,
+                'longitude': longitude,
+                'description': description,
+                'amenities': amenities,
+                'image_url': image_url,
+                'is_beachfront': is_beachfront,
+                'beach_confidence': beach_confidence,
+                'instant_book': instant_book,
+                'superhost': superhost,
+                'cleaning_fee': cleaning_fee,
+                'service_fee': service_fee,
+                'total_price': total_price,
+                'minimum_nights': minimum_nights,
+                'maximum_nights': maximum_nights,
+                'availability_365': availability_365,
+                'host_name': host_name,
+                'host_id': host_id,
+                'host_response_rate': host_response_rate,
+                'host_response_time': host_response_time,
+                'extraction_method': extraction_method,
+                'data_quality_score': data_quality_score,
+                'last_scraped': last_scraped
             }
             
             # Remover campos None para não sobrescrever valores padrão
@@ -940,23 +1070,12 @@ class HostLinkDatabase:
     def check_availability(self, listing_id: int, start_date: str, end_date: str) -> bool:
         """Verificar se um anúncio está disponível em um período"""
         try:
-            # Buscar disponibilidade no período
-            result = self.supabase.table('listing_availability').select(
-                'date, is_available'
-            ).eq('listing_id', listing_id).gte('date', start_date).lte('date', end_date).execute()
+            from datetime import datetime, timedelta
             
-            if not result.data:
-                return False
-            
-            # Verificar se todas as datas estão disponíveis
-            for item in result.data:
-                if not item['is_available']:
-                    return False
-            
-            # Verificar se não há reservas conflitantes
+            # Primeiro, verificar se não há reservas conflitantes
             bookings_result = self.supabase.table('listing_bookings').select(
                 'checkin_date, checkout_date'
-            ).eq('listing_id', listing_id).eq('status', 'confirmed').execute()
+            ).eq('listing_id', listing_id).in_('status', ['confirmed', 'pending']).execute()
             
             for booking in bookings_result.data:
                 booking_start = booking['checkin_date']
@@ -965,6 +1084,37 @@ class HostLinkDatabase:
                 # Verificar sobreposição de datas
                 if (start_date <= booking_end and end_date >= booking_start):
                     return False
+            
+            # Buscar disponibilidade configurada no período
+            result = self.supabase.table('listing_availability').select(
+                'date, is_available'
+            ).eq('listing_id', listing_id).gte('date', start_date).lte('date', end_date).execute()
+            
+            # Se não há configuração de disponibilidade, assumir que está disponível
+            # (desde que não haja reservas conflitantes, já verificado acima)
+            if not result.data:
+                return True
+            
+            # Se há configuração, verificar se todas as datas do período estão marcadas como disponíveis
+            # Criar lista de todas as datas no período solicitado
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+            
+            current_date = start_dt
+            required_dates = set()
+            while current_date <= end_dt:
+                required_dates.add(current_date.strftime('%Y-%m-%d'))
+                current_date += timedelta(days=1)
+            
+            # Verificar se todas as datas necessárias estão configuradas e disponíveis
+            configured_dates = {item['date']: item['is_available'] for item in result.data}
+            
+            for date in required_dates:
+                # Se a data está configurada, verificar se está disponível
+                if date in configured_dates:
+                    if not configured_dates[date]:
+                        return False
+                # Se a data não está configurada, assumir que está disponível
             
             return True
         except Exception as e:
@@ -1488,6 +1638,331 @@ class HostLinkDatabase:
             except Exception as e2:
                 print(f"❌ Erro na conexão com Supabase: {e2}")
                 return False
+
+    def create_review(self, booking_id: int, overall_rating: int, 
+                     cleanliness_rating: int = None, communication_rating: int = None,
+                     checkin_rating: int = None, accuracy_rating: int = None,
+                     location_rating: int = None, value_rating: int = None, 
+                     amenities_rating: int = None, review_title: str = None,
+                     review_comment: str = None, would_recommend: bool = True) -> int:
+        """
+        Cria uma nova avaliação de hospedagem
+        """
+        try:
+            # Buscar dados da reserva
+            booking_result = self.supabase.table('listing_bookings').select(
+                'listing_id, guest_user_id, host_user_id'
+            ).eq('id', booking_id).execute()
+            
+            if not booking_result.data:
+                print(f"❌ Reserva {booking_id} não encontrada")
+                return None
+            
+            booking = booking_result.data[0]
+            
+            review_data = {
+                'booking_id': booking_id,
+                'listing_id': booking['listing_id'],
+                'guest_user_id': booking['guest_user_id'],
+                'host_user_id': booking['host_user_id'],
+                'overall_rating': overall_rating,
+                'would_recommend': would_recommend,
+                'created_at': datetime.now().isoformat()
+            }
+            
+            # Adicionar avaliações opcionais
+            if cleanliness_rating:
+                review_data['cleanliness_rating'] = cleanliness_rating
+            if communication_rating:
+                review_data['communication_rating'] = communication_rating
+            if checkin_rating:
+                review_data['checkin_rating'] = checkin_rating
+            if accuracy_rating:
+                review_data['accuracy_rating'] = accuracy_rating
+            if location_rating:
+                review_data['location_rating'] = location_rating
+            if value_rating:
+                review_data['value_rating'] = value_rating
+            if amenities_rating:
+                review_data['amenities_rating'] = amenities_rating
+            if review_title:
+                review_data['review_title'] = review_title
+            if review_comment:
+                review_data['review_comment'] = review_comment
+            
+            result = self.supabase.table('accommodation_reviews').insert(review_data).execute()
+            
+            if result.data:
+                review_id = result.data[0]['id']
+                print(f"✅ Avaliação criada com ID: {review_id}")
+                
+                # Atualizar estatísticas do anúncio
+                self.update_listing_rating_stats(booking['listing_id'])
+                
+                return review_id
+            return None
+        except Exception as e:
+            print(f"❌ Erro ao criar avaliação: {e}")
+            return None
+    
+    def get_listing_reviews(self, listing_id: int, public_only: bool = True, limit: int = 50) -> List[Dict]:
+        """
+        Busca avaliações de um anúncio
+        """
+        try:
+            query = self.supabase.table('accommodation_reviews').select(
+                '*, users!guest_user_id(name)'
+            ).eq('listing_id', listing_id)
+            
+            if public_only:
+                query = query.eq('is_public', True).eq('is_approved', True)
+            
+            result = query.order('created_at', desc=True).limit(limit).execute()
+            return result.data
+        except Exception as e:
+            print(f"❌ Erro ao buscar avaliações: {e}")
+            return []
+    
+    def get_user_reviews(self, user_id: int, as_guest: bool = True, limit: int = 50) -> List[Dict]:
+        """
+        Busca avaliações de um usuário (como hóspede ou anfitrião)
+        """
+        try:
+            field = 'guest_user_id' if as_guest else 'host_user_id'
+            
+            query = self.supabase.table('accommodation_reviews').select(
+                '*, user_listings(title), users!guest_user_id(name)'
+            ).eq(field, user_id)
+            
+            result = query.order('created_at', desc=True).limit(limit).execute()
+            return result.data
+        except Exception as e:
+            print(f"❌ Erro ao buscar avaliações do usuário: {e}")
+            return []
+    
+    def get_booking_review(self, booking_id: int) -> Optional[Dict]:
+        """
+        Busca avaliação de uma reserva específica
+        """
+        try:
+            result = self.supabase.table('accommodation_reviews').select(
+                '*'
+            ).eq('booking_id', booking_id).execute()
+            
+            return result.data[0] if result.data else None
+        except Exception as e:
+            print(f"❌ Erro ao buscar avaliação da reserva: {e}")
+            return None
+    
+    def update_listing_rating_stats(self, listing_id: int) -> bool:
+        """
+        Atualiza as estatísticas de avaliação de um anúncio
+        """
+        try:
+            # Buscar todas as avaliações aprovadas do anúncio
+            reviews_result = self.supabase.table('accommodation_reviews').select(
+                'overall_rating'
+            ).eq('listing_id', listing_id).eq('is_approved', True).execute()
+            
+            if not reviews_result.data:
+                return True
+            
+            ratings = [review['overall_rating'] for review in reviews_result.data]
+            avg_rating = sum(ratings) / len(ratings)
+            review_count = len(ratings)
+            
+            # Atualizar anúncio com nova média e contagem
+            update_result = self.supabase.table('user_listings').update({
+                'rating': round(avg_rating, 2),
+                'reviews': review_count,
+                'updated_at': datetime.now().isoformat()
+            }).eq('id', listing_id).execute()
+            
+            return len(update_result.data) > 0
+        except Exception as e:
+            print(f"❌ Erro ao atualizar estatísticas de avaliação: {e}")
+            return False
+    
+    def can_user_review_booking(self, user_id: int, booking_id: int) -> bool:
+        """
+        Verifica se um usuário pode avaliar uma reserva
+        """
+        try:
+            # Verificar se a reserva existe e pertence ao usuário
+            booking_result = self.supabase.table('listing_bookings').select(
+                'guest_user_id, status, checkout_date'
+            ).eq('id', booking_id).eq('guest_user_id', user_id).execute()
+            
+            if not booking_result.data:
+                return False
+            
+            booking = booking_result.data[0]
+            
+            # Só pode avaliar se a reserva foi concluída
+            if booking['status'] != 'completed':
+                return False
+            
+            # Verificar se já não existe uma avaliação
+            review_result = self.supabase.table('accommodation_reviews').select(
+                'id'
+            ).eq('booking_id', booking_id).execute()
+            
+            return len(review_result.data) == 0
+        except Exception as e:
+            print(f"❌ Erro ao verificar permissão de avaliação: {e}")
+            return False
+    
+    def can_user_edit_review(self, user_id: int, booking_id: int) -> Dict:
+        """
+        Verifica se um usuário pode editar uma avaliação existente
+        Retorna dict com can_edit (bool) e reason (str)
+        """
+        try:
+            # Verificar se a reserva existe e pertence ao usuário
+            booking_result = self.supabase.table('listing_bookings').select(
+                'guest_user_id, status, checkout_date'
+            ).eq('id', booking_id).eq('guest_user_id', user_id).execute()
+            
+            if not booking_result.data:
+                return {'can_edit': False, 'reason': 'Reserva não encontrada'}
+            
+            booking = booking_result.data[0]
+            
+            # Só pode editar se a reserva foi concluída
+            if booking['status'] != 'completed':
+                return {'can_edit': False, 'reason': 'Reserva não foi concluída'}
+            
+            # Verificar se existe uma avaliação
+            review_result = self.supabase.table('accommodation_reviews').select(
+                'id, created_at'
+            ).eq('booking_id', booking_id).execute()
+            
+            if not review_result.data:
+                return {'can_edit': False, 'reason': 'Nenhuma avaliação encontrada'}
+            
+            review = review_result.data[0]
+            
+            # Verificar se ainda está dentro do prazo de 10 dias
+            from datetime import datetime, timedelta
+            review_date = datetime.fromisoformat(review['created_at'].replace('Z', '+00:00'))
+            current_date = datetime.now(review_date.tzinfo)
+            days_since_review = (current_date - review_date).days
+            
+            if days_since_review > 10:
+                return {
+                    'can_edit': False, 
+                    'reason': f'Prazo para reavaliar já se esgotou ({days_since_review} dias desde a avaliação)'
+                }
+            
+            return {
+                'can_edit': True, 
+                'reason': f'Pode editar (ainda restam {10 - days_since_review} dias)'
+            }
+            
+        except Exception as e:
+            print(f"❌ Erro ao verificar permissão de edição: {e}")
+            return {'can_edit': False, 'reason': 'Erro interno'}
+    
+    def update_review(self, booking_id: int, user_id: int, **review_data) -> bool:
+        """
+        Atualiza uma avaliação existente
+        """
+        try:
+            # Verificar se pode editar
+            edit_check = self.can_user_edit_review(user_id, booking_id)
+            if not edit_check['can_edit']:
+                print(f"❌ Não pode editar: {edit_check['reason']}")
+                return False
+            
+            # Preparar dados para atualização
+            update_data = {}
+            allowed_fields = [
+                'overall_rating', 'cleanliness_rating', 'communication_rating',
+                'checkin_rating', 'accuracy_rating', 'location_rating', 'value_rating',
+                'amenities_rating', 'review_title', 'review_comment', 'would_recommend'
+            ]
+            
+            for field, value in review_data.items():
+                if field in allowed_fields and value is not None:
+                    update_data[field] = value
+            
+            if not update_data:
+                print("❌ Nenhum campo válido para atualizar")
+                return False
+            
+            # Adicionar timestamp de atualização
+            update_data['updated_at'] = datetime.now().isoformat()
+            
+            # Atualizar a avaliação
+            result = self.supabase.table('accommodation_reviews').update(
+                update_data
+            ).eq('booking_id', booking_id).execute()
+            
+            if result.data:
+                print(f"✅ Avaliação atualizada com sucesso")
+                
+                # Atualizar estatísticas do anúncio
+                booking_result = self.supabase.table('listing_bookings').select(
+                    'listing_id'
+                ).eq('id', booking_id).execute()
+                
+                if booking_result.data:
+                    self.update_listing_rating_stats(booking_result.data[0]['listing_id'])
+                
+                return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"❌ Erro ao atualizar avaliação: {e}")
+            return False
+    
+    def get_listing_rating_summary(self, listing_id: int) -> Dict:
+        """
+        Retorna resumo das avaliações de um anúncio
+        """
+        try:
+            result = self.supabase.table('accommodation_reviews').select(
+                'overall_rating, cleanliness_rating, communication_rating, location_rating, value_rating, amenities_rating, would_recommend'
+            ).eq('listing_id', listing_id).eq('is_approved', True).execute()
+            
+            if not result.data:
+                return {
+                    'total_reviews': 0,
+                    'average_overall': 0,
+                    'average_cleanliness': 0,
+                    'average_communication': 0,
+                    'average_location': 0,
+                    'average_value': 0,
+                    'average_amenities': 0,
+                    'recommendation_rate': 0
+                }
+            
+            reviews = result.data
+            total = len(reviews)
+            
+            # Calcular médias
+            overall_ratings = [r['overall_rating'] for r in reviews]
+            cleanliness_ratings = [r['cleanliness_rating'] for r in reviews if r['cleanliness_rating']]
+            communication_ratings = [r['communication_rating'] for r in reviews if r['communication_rating']]
+            location_ratings = [r['location_rating'] for r in reviews if r['location_rating']]
+            value_ratings = [r['value_rating'] for r in reviews if r['value_rating']]
+            amenities_ratings = [r['amenities_rating'] for r in reviews if r['amenities_rating']]
+            recommendations = [r['would_recommend'] for r in reviews if r['would_recommend'] is not None]
+            
+            return {
+                'total_reviews': total,
+                'average_overall': round(sum(overall_ratings) / len(overall_ratings), 2) if overall_ratings else 0,
+                'average_cleanliness': round(sum(cleanliness_ratings) / len(cleanliness_ratings), 2) if cleanliness_ratings else 0,
+                'average_communication': round(sum(communication_ratings) / len(communication_ratings), 2) if communication_ratings else 0,
+                'average_location': round(sum(location_ratings) / len(location_ratings), 2) if location_ratings else 0,
+                'average_value': round(sum(value_ratings) / len(value_ratings), 2) if value_ratings else 0,
+                'average_amenities': round(sum(amenities_ratings) / len(amenities_ratings), 2) if amenities_ratings else 0,
+                'recommendation_rate': round((sum(recommendations) / len(recommendations)) * 100, 1) if recommendations else 0
+            }
+        except Exception as e:
+            print(f"❌ Erro ao buscar resumo de avaliações: {e}")
+            return {}
 
 # Instância global do banco
 db = None

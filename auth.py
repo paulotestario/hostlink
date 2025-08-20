@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Módulo de Autenticação com Google OAuth
+Módulo de Autenticação - Google OAuth e Email/Senha
 Gerencia login e logout de usuários
 """
 
 import os
 import json
+import secrets
+import hashlib
+from datetime import datetime, timedelta
 from flask import session, redirect, url_for, request, flash
 from flask_login import UserMixin, login_user, logout_user, login_required, current_user
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from google_auth_oauthlib.flow import Flow
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -45,7 +49,7 @@ class User(UserMixin):
         return None
 
     @staticmethod
-    def create(id_, name, email, profile_pic):
+    def create(id_, name, email, profile_pic, auth_type='google'):
         """Cria novo usuário"""
         from database import get_database
         
@@ -53,7 +57,11 @@ class User(UserMixin):
         db = get_database()
         if db:
             try:
-                user_db_id = db.save_user(id_, email, name, profile_pic)
+                if auth_type == 'google':
+                    user_db_id = db.save_user(id_, email, name, profile_pic)
+                else:
+                    user_db_id = db.save_email_user(email, name, profile_pic)
+                    
                 if user_db_id:
                     session['user_db_id'] = user_db_id
                     print(f"✅ Usuário salvo no banco com ID: {user_db_id}")
@@ -70,6 +78,85 @@ class User(UserMixin):
             'profile_pic': profile_pic
         }
         return user
+    
+    @staticmethod
+    def create_email_user(email, name, password):
+        """Cria usuário com autenticação por email"""
+        from database import get_database
+        
+        db = get_database()
+        if not db:
+            return None
+            
+        try:
+            # Verificar se email já existe
+            existing_user = db.get_user_by_email(email)
+            if existing_user:
+                return None  # Email já existe
+            
+            # Criar hash da senha
+            password_hash = generate_password_hash(password)
+            
+            # Gerar token de verificação
+            verification_token = secrets.token_urlsafe(32)
+            
+            # Salvar usuário
+            user_db_id = db.create_email_user(email, name, password_hash, verification_token)
+            
+            if user_db_id:
+                # Criar ID único para sessão
+                user_id = f"email_{user_db_id}"
+                
+                user = User(user_id, name, email, '', db_id=user_db_id)
+                session['user'] = {
+                    'id': user_id,
+                    'name': name,
+                    'email': email,
+                    'profile_pic': ''
+                }
+                session['user_db_id'] = user_db_id
+                return user
+                
+        except Exception as e:
+            print(f"❌ Erro ao criar usuário por email: {e}")
+            
+        return None
+    
+    @staticmethod
+    def authenticate_email(email, password):
+        """Autentica usuário por email e senha"""
+        from database import get_database
+        
+        db = get_database()
+        if not db:
+            return None
+            
+        try:
+            user_data = db.authenticate_email_user(email, password)
+            if user_data:
+                user_id = f"email_{user_data['id']}"
+                
+                user = User(
+                    id_=user_id,
+                    name=user_data['name'],
+                    email=user_data['email'],
+                    profile_pic=user_data.get('profile_pic', ''),
+                    db_id=user_data['id']
+                )
+                
+                session['user'] = {
+                    'id': user_id,
+                    'name': user_data['name'],
+                    'email': user_data['email'],
+                    'profile_pic': user_data.get('profile_pic', '')
+                }
+                session['user_db_id'] = user_data['id']
+                return user
+                
+        except Exception as e:
+            print(f"❌ Erro na autenticação por email: {e}")
+            
+        return None
 
 class GoogleAuth:
     """Classe para gerenciar autenticação Google OAuth"""

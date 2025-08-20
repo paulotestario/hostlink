@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avaliar Hospedagem - HostLink</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='hostlink-theme.css') }}" rel="stylesheet">
+    <style>
+        .rating-stars {
+            font-size: 1.5rem;
+            color: #ddd;
+            cursor: pointer;
+        }
+        .rating-stars .star {
+            transition: color 0.2s;
+        }
+        .rating-stars .star:hover,
+        .rating-stars .star.active {
+            color: #ffc107;
+        }
+        .rating-category {
+            margin-bottom: 1.5rem;
+        }
+        .rating-label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-home me-2"></i>HostLink
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('minhas_reservas') }}">
+                    <i class="fas fa-calendar-alt me-1"></i>Minhas Reservas
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-star me-2"></i>Avaliar Hospedagem
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <!-- Informações da Reserva -->
+                        <div class="alert alert-info mb-4">
+                            <h6><i class="fas fa-info-circle me-2"></i>Informações da Reserva</h6>
+                            <p class="mb-1"><strong>Hospedagem:</strong> <span id="listing-title">Carregando...</span></p>
+                            <p class="mb-1"><strong>Check-in:</strong> <span id="checkin-date">Carregando...</span></p>
+                            <p class="mb-0"><strong>Check-out:</strong> <span id="checkout-date">Carregando...</span></p>
+                        </div>
+
+                        <!-- Formulário de Avaliação -->
+                        <form id="reviewForm">
+                            <input type="hidden" id="booking-id" name="booking_id">
+                            <input type="hidden" id="listing-id" name="listing_id">
+
+                            <!-- Avaliação Geral -->
+                            <div class="rating-category">
+                                <div class="rating-label">Avaliação Geral *</div>
+                                <div class="rating-stars" data-rating="overall_rating">
+                                    <i class="fas fa-star star" data-value="1"></i>
+                                    <i class="fas fa-star star" data-value="2"></i>
+                                    <i class="fas fa-star star" data-value="3"></i>
+                                    <i class="fas fa-star star" data-value="4"></i>
+                                    <i class="fas fa-star star" data-value="5"></i>
+                                </div>
+                                <input type="hidden" name="overall_rating" required>
+                            </div>
+
+                            <!-- Limpeza -->
+                            <div class="rating-category">
+                                <div class="rating-label">Limpeza *</div>
+                                <div class="rating-stars" data-rating="cleanliness_rating">
+                                    <i class="fas fa-star star" data-value="1"></i>
+                                    <i class="fas fa-star star" data-value="2"></i>
+                                    <i class="fas fa-star star" data-value="3"></i>
+                                    <i class="fas fa-star star" data-value="4"></i>
+                                    <i class="fas fa-star star" data-value="5"></i>
+                                </div>
+                                <input type="hidden" name="cleanliness_rating" required>
+                            </div>
+
+                            <!-- Comunicação -->
+                            <div class="rating-category">
+                                <div class="rating-label">Comunicação *</div>
+                                <div class="rating-stars" data-rating="communication_rating">
+                                    <i class="fas fa-star star" data-value="1"></i>
+                                    <i class="fas fa-star star" data-value="2"></i>
+                                    <i class="fas fa-star star" data-value="3"></i>
+                                    <i class="fas fa-star star" data-value="4"></i>
+                                    <i class="fas fa-star star" data-value="5"></i>
+                                </div>
+                                <input type="hidden" name="communication_rating" required>
+                            </div>
+
+                            <!-- Check-in -->
+                            <div class="rating-category">
+                                <div class="rating-label">Check-in *</div>
+                                <div class="rating-stars" data-rating="checkin_rating">
+                                    <i class="fas fa-star star" data-value="1"></i>
+                                    <i class="fas fa-star star" data-value="2"></i>
+                                    <i class="fas fa-star star" data-value="3"></i>
+                                    <i class="fas fa-star star" data-value="4"></i>
+                                    <i class="fas fa-star star" data-value="5"></i>
+                                </div>
+                                <input type="hidden" name="checkin_rating" required>
+                            </div>
+
+                            <!-- Precisão do Anúncio -->
+                            <div class="rating-category">
+                                <div class="rating-label">Precisão do Anúncio *</div>
+                                <div class="rating-stars" data-rating="accuracy_rating">
+                                    <i class="fas fa-star star" data-value="1"></i>
+                                    <i class="fas fa-star star" data-value="2"></i>
+                                    <i class="fas fa-star star" data-value="3"></i>
+                                    <i class="fas fa-star star" data-value="4"></i>
+                                    <i class="fas fa-star star" data-value="5"></i>
+                                </div>
+                                <input type="hidden" name="accuracy_rating" required>
+                            </div>
+
+                            <!-- Localização -->
+                            <div class="rating-category">
+                                <div class="rating-label">Localização *</div>
+                                <div class="rating-stars" data-rating="location_rating">
+                                    <i class="fas fa-star star" data-value="1"></i>
+                                    <i class="fas fa-star star" data-value="2"></i>
+                                    <i class="fas fa-star star" data-value="3"></i>
+                                    <i class="fas fa-star star" data-value="4"></i>
+                                    <i class="fas fa-star star" data-value="5"></i>
+                                </div>
+                                <input type="hidden" name="location_rating" required>
+                            </div>
+
+                            <!-- Custo-Benefício -->
+                            <div class="rating-category">
+                                <div class="rating-label">Custo-Benefício *</div>
+                                <div class="rating-stars" data-rating="value_rating">
+                                    <i class="fas fa-star star" data-value="1"></i>
+                                    <i class="fas fa-star star" data-value="2"></i>
+                                    <i class="fas fa-star star" data-value="3"></i>
+                                    <i class="fas fa-star star" data-value="4"></i>
+                                    <i class="fas fa-star star" data-value="5"></i>
+                                </div>
+                                <input type="hidden" name="value_rating" required>
+                            </div>
+
+                            <!-- Título da Avaliação -->
+                            <div class="mb-3">
+                                <label for="review_title" class="form-label">Título da Avaliação</label>
+                                <input type="text" class="form-control" id="review_title" name="review_title" 
+                                       placeholder="Ex: Excelente hospedagem!" maxlength="255">
+                            </div>
+
+                            <!-- Comentário -->
+                            <div class="mb-3">
+                                <label for="review_comment" class="form-label">Comentário</label>
+                                <textarea class="form-control" id="review_comment" name="review_comment" 
+                                          rows="4" placeholder="Conte sobre sua experiência..."></textarea>
+                            </div>
+
+                            <!-- Recomendação -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="would_recommend" 
+                                           name="would_recommend" checked>
+                                    <label class="form-check-label" for="would_recommend">
+                                        Eu recomendaria esta hospedagem
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Visibilidade -->
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="is_public" 
+                                           name="is_public" checked>
+                                    <label class="form-check-label" for="is_public">
+                                        Tornar esta avaliação pública
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Botões -->
+                            <div class="d-flex justify-content-between">
+                                <a href="{{ url_for('minhas_reservas') }}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>Voltar
+                                </a>
+                                <button type="submit" class="btn btn-primary" id="submitBtn">
+                                    <i class="fas fa-star me-2"></i>Enviar Avaliação
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Funcionalidade das estrelas
+        document.querySelectorAll('.rating-stars').forEach(ratingContainer => {
+            const stars = ratingContainer.querySelectorAll('.star');
+            const ratingName = ratingContainer.dataset.rating;
+            const hiddenInput = document.querySelector(`input[name="${ratingName}"]`);
+            
+            stars.forEach((star, index) => {
+                star.addEventListener('click', () => {
+                    const rating = index + 1;
+                    hiddenInput.value = rating;
+                    
+                    // Atualizar visual das estrelas
+                    stars.forEach((s, i) => {
+                        if (i < rating) {
+                            s.classList.add('active');
+                        } else {
+                            s.classList.remove('active');
+                        }
+                    });
+                });
+                
+                star.addEventListener('mouseenter', () => {
+                    stars.forEach((s, i) => {
+                        if (i <= index) {
+                            s.style.color = '#ffc107';
+                        } else {
+                            s.style.color = '#ddd';
+                        }
+                    });
+                });
+            });
+            
+            ratingContainer.addEventListener('mouseleave', () => {
+                const currentRating = parseInt(hiddenInput.value) || 0;
+                stars.forEach((s, i) => {
+                    if (i < currentRating) {
+                        s.style.color = '#ffc107';
+                    } else {
+                        s.style.color = '#ddd';
+                    }
+                });
+            });
+        });
+
+        let isEditMode = false;
+        let existingReview = null;
+
+        // Carregar dados da reserva
+        async function loadBookingData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const bookingId = urlParams.get('booking_id');
+            
+            if (!bookingId) {
+                alert('ID da reserva não encontrado!');
+                window.location.href = '/minhas-reservas';
+                return;
+            }
+            
+            document.getElementById('booking-id').value = bookingId;
+            
+            try {
+                // Buscar dados reais da reserva
+                const response = await fetch(`/api/booking/${bookingId}`);
+                const data = await response.json();
+                
+                if (data.success && data.booking) {
+                    const booking = data.booking;
+                    const listing = booking.user_listings;
+                    
+                    // Atualizar informações da reserva
+                    document.getElementById('listing-title').textContent = listing.title || 'Título não disponível';
+                    
+                    // Formatar datas de forma mais robusta
+                    const formatDate = (dateString) => {
+                        const [year, month, day] = dateString.split('-');
+                        return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+                    };
+                    
+                    const checkinDate = formatDate(booking.checkin_date);
+                    const checkoutDate = formatDate(booking.checkout_date);
+                    
+                    document.getElementById('checkin-date').textContent = checkinDate;
+                    document.getElementById('checkout-date').textContent = checkoutDate;
+                    document.getElementById('listing-id').value = listing.id;
+                    
+                    // Verificar se pode editar avaliação existente
+                    await checkEditPermission(bookingId);
+                } else {
+                    console.error('Erro ao carregar dados da reserva:', data.error);
+                    alert('Erro ao carregar dados da reserva: ' + (data.error || 'Erro desconhecido'));
+                    window.location.href = '/minhas-reservas';
+                }
+            } catch (error) {
+                console.error('Erro na requisição:', error);
+                alert('Erro ao carregar dados da reserva. Tente novamente.');
+                window.location.href = '/minhas-reservas';
+            }
+        }
+
+        // Verificar permissão de edição
+        async function checkEditPermission(bookingId) {
+            try {
+                const response = await fetch(`/api/reviews/can-edit/${bookingId}`);
+                const result = await response.json();
+                
+                if (result.can_edit) {
+                    isEditMode = true;
+                    existingReview = result.review;
+                    loadExistingReview();
+                    document.querySelector('h2').textContent = 'Editar Avaliação';
+                    document.getElementById('submitBtn').innerHTML = '<i class="fas fa-edit me-2"></i>Atualizar Avaliação';
+                } else if (result.reason === 'expired') {
+                    // Mostrar mensagem de prazo expirado
+                    showExpiredMessage();
+                } else if (result.reason === 'review_exists') {
+                    // Avaliação existe mas não pode editar
+                    alert('Você já avaliou esta reserva e o prazo para edição expirou.');
+                    window.location.href = '/minhas-reservas';
+                }
+            } catch (error) {
+                console.error('Erro ao verificar permissão de edição:', error);
+            }
+        }
+
+        // Carregar avaliação existente
+        function loadExistingReview() {
+            if (!existingReview) return;
+            
+            // Carregar ratings
+            setStarRating('overall_rating', existingReview.overall_rating);
+            setStarRating('cleanliness_rating', existingReview.cleanliness_rating);
+            setStarRating('communication_rating', existingReview.communication_rating);
+            setStarRating('checkin_rating', existingReview.checkin_rating);
+            setStarRating('accuracy_rating', existingReview.accuracy_rating);
+            setStarRating('location_rating', existingReview.location_rating);
+            setStarRating('value_rating', existingReview.value_rating);
+            
+            // Carregar outros campos
+            document.getElementById('review_title').value = existingReview.title || '';
+            document.getElementById('review_comment').value = existingReview.comment || '';
+            document.getElementById('would_recommend').checked = existingReview.would_recommend || false;
+            document.getElementById('is_public').checked = existingReview.is_public || false;
+        }
+
+        // Definir rating de estrelas
+        function setStarRating(ratingName, value) {
+            const input = document.querySelector(`input[name="${ratingName}"]`);
+            const stars = document.querySelectorAll(`input[name="${ratingName}"] + label`);
+            
+            if (input) {
+                input.value = value;
+                
+                // Atualizar visual das estrelas
+                stars.forEach((star, index) => {
+                    if (index < value) {
+                        star.style.color = '#ffc107';
+                    } else {
+                        star.style.color = '#ddd';
+                    }
+                });
+            }
+        }
+
+        // Mostrar mensagem de prazo expirado
+        function showExpiredMessage() {
+            const container = document.querySelector('.container');
+            container.innerHTML = `
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clock text-warning" style="font-size: 4rem; margin-bottom: 1rem;"></i>
+                                <h3 class="text-warning">Prazo para Reavaliação Expirado</h3>
+                                <p class="lead">O prazo de 10 dias para editar sua avaliação já se esgotou.</p>
+                                <p>Você pode visualizar sua avaliação anterior, mas não é mais possível editá-la.</p>
+                                <a href="/minhas-reservas" class="btn btn-primary">
+                                    <i class="fas fa-arrow-left me-2"></i>Voltar para Minhas Reservas
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Enviar avaliação
+        document.getElementById('reviewForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.innerHTML;
+            
+            // Validar se todas as avaliações obrigatórias foram preenchidas
+            const requiredRatings = ['overall_rating', 'cleanliness_rating', 'communication_rating', 
+                                   'checkin_rating', 'accuracy_rating', 'location_rating', 'value_rating'];
+            
+            for (const rating of requiredRatings) {
+                if (!document.querySelector(`input[name="${rating}"]`).value) {
+                    alert('Por favor, preencha todas as avaliações obrigatórias.');
+                    return;
+                }
+            }
+            
+            const loadingText = isEditMode ? 
+                '<i class="fas fa-spinner fa-spin me-2"></i>Atualizando...' : 
+                '<i class="fas fa-spinner fa-spin me-2"></i>Enviando...';
+            
+            submitBtn.innerHTML = loadingText;
+            submitBtn.disabled = true;
+            
+            try {
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                
+                // Converter checkboxes para boolean
+                data.would_recommend = document.getElementById('would_recommend').checked;
+                data.is_public = document.getElementById('is_public').checked;
+                
+                const method = isEditMode ? 'PUT' : 'POST';
+                const successMessage = isEditMode ? 'Avaliação atualizada com sucesso!' : 'Avaliação enviada com sucesso!';
+                
+                const response = await fetch('/api/reviews', {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(successMessage);
+                    window.location.href = '/minhas-reservas';
+                } else {
+                    const errorMessage = isEditMode ? 'Erro ao atualizar avaliação: ' : 'Erro ao enviar avaliação: ';
+                    alert(errorMessage + result.error);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                const errorMessage = isEditMode ? 'Erro ao atualizar avaliação. Tente novamente.' : 'Erro ao enviar avaliação. Tente novamente.';
+                alert(errorMessage);
+            } finally {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Carregar dados quando a página carregar
+        document.addEventListener('DOMContentLoaded', loadBookingData);
+    </script>
+</body>
+</html>

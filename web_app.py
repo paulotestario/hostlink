@@ -136,6 +136,116 @@ def logout():
     flash('Logout realizado com sucesso.', 'success')
     return redirect(url_for('login'))
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Página de registro"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        # Validações
+        if not name or len(name) < 2:
+            flash('Nome deve ter pelo menos 2 caracteres.', 'error')
+            return render_template('register.html')
+        
+        if not email or '@' not in email:
+            flash('Email inválido.', 'error')
+            return render_template('register.html')
+        
+        if not password or len(password) < 6:
+            flash('Senha deve ter pelo menos 6 caracteres.', 'error')
+            return render_template('register.html')
+        
+        if password != confirm_password:
+            flash('Senhas não coincidem.', 'error')
+            return render_template('register.html')
+        
+        # Verificar se email já existe e qual tipo de autenticação
+        db = get_database()
+        if db:
+            auth_type = db.check_email_auth_type(email)
+            if auth_type == 'google':
+                flash('Este email já está cadastrado com conta Google. Por favor, faça login usando sua conta Google.', 'error')
+                return render_template('register.html')
+            elif auth_type == 'email':
+                flash('Este email já está cadastrado.', 'error')
+                return render_template('register.html')
+        
+        # Criar usuário
+        user = User.create_email_user(email, name, password)
+        if user:
+            login_user(user, remember=True)
+            flash(f'Conta criada com sucesso! Bem-vindo, {user.name}!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Erro ao criar conta. Tente novamente.', 'error')
+    
+    return render_template('register.html')
+
+@app.route('/auth/email', methods=['POST'])
+def auth_email():
+    """Autenticação por email e senha"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    email = request.form.get('email', '').strip().lower()
+    password = request.form.get('password', '')
+    
+    if not email or not password:
+        flash('Email e senha são obrigatórios.', 'error')
+        return redirect(url_for('login'))
+    
+    # Verificar se email existe e qual tipo de autenticação
+    db = get_database()
+    if db:
+        auth_type = db.check_email_auth_type(email)
+        if auth_type == 'google':
+            flash('Este email está associado a uma conta Google. Por favor, faça login usando sua conta Google.', 'error')
+            return redirect(url_for('login'))
+        elif auth_type is None:
+            flash('Email não encontrado. Verifique o email ou crie uma nova conta.', 'error')
+            return redirect(url_for('login'))
+    
+    # Autenticar usuário
+    user = User.authenticate_email(email, password)
+    if user:
+        login_user(user, remember=True)
+        flash(f'Bem-vindo de volta, {user.name}!', 'success')
+        
+        # Redirecionar para página solicitada ou página inicial
+        next_page = request.args.get('next')
+        return redirect(next_page) if next_page else redirect(url_for('index'))
+    else:
+        flash('Email ou senha incorretos.', 'error')
+        return redirect(url_for('login'))
+
+@app.route('/check-email-auth-type', methods=['POST'])
+def check_email_auth_type():
+    """Verifica o tipo de autenticação de um email via AJAX"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        
+        if not email:
+            return jsonify({'auth_type': None})
+        
+        # Verificar tipo de autenticação do email
+        db = get_database()
+        if db:
+            auth_type = db.check_email_auth_type(email)
+            return jsonify({'auth_type': auth_type})
+        else:
+            return jsonify({'auth_type': None})
+            
+    except Exception as e:
+        print(f"Erro ao verificar tipo de autenticação do email: {e}")
+        return jsonify({'auth_type': None})
+
 @app.route('/analise')
 @login_required
 def analise():
@@ -205,13 +315,30 @@ def perfil():
 def minhas_reservas():
     """Página das reservas do usuário"""
     user_db_id = session.get('user_db_id')
-    if not user_db_id or not db:
+    current_user_db_id = getattr(current_user, 'db_id', None)
+    
+    print(f"🔍 Debug minhas_reservas: session user_db_id = {user_db_id}")
+    print(f"🔍 Debug minhas_reservas: current_user.db_id = {current_user_db_id}")
+    print(f"🔍 Debug minhas_reservas: current_user.id = {current_user.id}")
+    print(f"🔍 Debug minhas_reservas: current_user.email = {current_user.email}")
+    
+    # Usar o db_id do current_user se disponível, senão usar da sessão
+    effective_user_id = current_user_db_id or user_db_id
+    
+    # Cada usuário deve ver apenas suas próprias reservas
+    print(f"🔍 Buscando reservas para usuário: {current_user.email} (ID: {effective_user_id})")
+    
+    if not effective_user_id or not db:
+        print(f"❌ Erro: effective_user_id={effective_user_id}, db={db}")
         flash('Erro ao carregar reservas do usuário', 'error')
         return redirect(url_for('index'))
     
     try:
         # Buscar todas as reservas do usuário
-        bookings = db.get_user_bookings(user_db_id)
+        bookings = db.get_user_bookings(effective_user_id)
+        print(f"🔍 Debug: Encontradas {len(bookings) if bookings else 0} reservas para user_id {effective_user_id}")
+        
+        # Não buscar reservas de outros usuários - cada usuário vê apenas as suas próprias
         
         return render_template('minhas_reservas.html', 
                              bookings=bookings,
@@ -2167,6 +2294,20 @@ def create_booking():
                 'error': 'Todos os campos são obrigatórios'
             }), 400
         
+        # Verificar se o usuário não é o dono do anúncio
+        listing = db.get_public_listing_by_id(listing_id)
+        if not listing:
+            return jsonify({
+                'success': False,
+                'error': 'Anúncio não encontrado'
+            }), 404
+        
+        if listing.get('user_id') == guest_user_id:
+            return jsonify({
+                'success': False,
+                'error': 'Você não pode reservar seu próprio anúncio'
+            }), 400
+        
         # Salvar reserva
         booking_id = db.save_booking(
             listing_id=listing_id,
@@ -2370,6 +2511,77 @@ def confirm_booking(booking_id):
             'error': str(e)
         }), 500
 
+@app.route('/api/complete-booking/<int:booking_id>', methods=['POST'])
+@login_required
+def complete_booking(booking_id):
+    """Marcar uma reserva como concluída - permitido apenas para anfitrião"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não autenticado'
+            }), 401
+        
+        # Buscar a reserva específica
+        booking_result = db.supabase.table('listing_bookings').select(
+            '*, user_listings(user_id, title)'
+        ).eq('id', booking_id).execute()
+        
+        if not booking_result.data:
+            return jsonify({
+                'success': False,
+                'error': 'Reserva não encontrada'
+            }), 404
+        
+        booking = booking_result.data[0]
+        
+        # Verificar se o usuário é o anfitrião (dono do anúncio)
+        if booking.get('user_listings', {}).get('user_id') != user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Você não tem permissão para marcar esta reserva como concluída'
+            }), 403
+        
+        # Verificar se a reserva está confirmada
+        if booking.get('status') != 'confirmed':
+            return jsonify({
+                'success': False,
+                'error': 'Apenas reservas confirmadas podem ser marcadas como concluídas'
+            }), 400
+        
+        # Verificar se a data de checkout já passou
+        from datetime import datetime
+        checkout_date = datetime.strptime(booking['checkout_date'], '%Y-%m-%d')
+        today = datetime.now()
+        
+        if checkout_date.date() > today.date():
+            return jsonify({
+                'success': False,
+                'error': 'A reserva só pode ser marcada como concluída após a data de checkout'
+            }), 400
+        
+        # Atualizar status da reserva para 'completed'
+        success = db.update_booking_status(booking_id, 'completed')
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Reserva marcada como concluída com sucesso'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao marcar reserva como concluída'
+            }), 500
+            
+    except Exception as e:
+        print(f"Erro ao marcar reserva como concluída: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/anuncios/todos', methods=['GET'])
 def get_all_listings():
     """Buscar todos os anúncios públicos"""
@@ -2419,7 +2631,10 @@ def get_listings_by_period():
         data_inicio = request.args.get('data_inicio')
         data_fim = request.args.get('data_fim')
         
+        print(f"🔍 [FILTRO] Requisição recebida - Início: {data_inicio}, Fim: {data_fim}")
+        
         if not data_inicio or not data_fim:
+            print("❌ [FILTRO] Datas não fornecidas")
             return jsonify({
                 'success': False,
                 'message': 'Datas de início e fim são obrigatórias'
@@ -2427,12 +2642,20 @@ def get_listings_by_period():
         
         # Buscar todos os anúncios
         all_listings = db.get_all_public_listings()
+        print(f"📋 [FILTRO] Total de anúncios encontrados: {len(all_listings)}")
         
         # Para cada anúncio, verificar disponibilidade no período
         listings_with_availability = []
+        available_count = 0
+        
         for listing in all_listings:
             # Verificar se está disponível no período
             is_available = db.check_availability(listing['id'], data_inicio, data_fim)
+            
+            if is_available:
+                available_count += 1
+            
+            print(f"🏠 [FILTRO] Anúncio {listing['id']} ({listing.get('title', 'Sem título')[:30]}...) - Disponível: {is_available}")
             
             listing_data = dict(listing)
             listing_data['available'] = is_available
@@ -2449,6 +2672,8 @@ def get_listings_by_period():
             
             listings_with_availability.append(listing_data)
         
+        print(f"✅ [FILTRO] Resultado: {available_count} de {len(all_listings)} anúncios disponíveis no período")
+        
         return jsonify({
             'success': True,
             'listings': listings_with_availability
@@ -2459,6 +2684,73 @@ def get_listings_by_period():
         return jsonify({
             'success': False,
             'message': 'Erro interno do servidor'
+        }), 500
+
+@app.route('/api/anuncios/<int:listing_id>/disponibilidade', methods=['GET'])
+def get_listing_availability(listing_id):
+    """Buscar disponibilidade de um anúncio para calendário"""
+    try:
+        # Obter parâmetros de mês e ano da query string
+        month = request.args.get('month', type=int)
+        year = request.args.get('year', type=int)
+        
+        # Se não especificado, usar mês/ano atual
+        if not month or not year:
+            today = datetime.now().date()
+            month = today.month
+            year = today.year
+        
+        print(f"📅 [CALENDARIO] Buscando disponibilidade para anúncio {listing_id} - {month}/{year}")
+        
+        # Verificar se o anúncio existe
+        listing = db.get_public_listing_by_id(listing_id)
+        if not listing:
+            return jsonify({
+                'success': False,
+                'message': 'Anúncio não encontrado'
+            }), 404
+        
+        # Validar se o mês/ano não é muito no passado ou futuro
+        today = datetime.now().date()
+        requested_date = datetime(year, month, 1).date()
+        max_future_date = today.replace(year=today.year + 1)  # 12 meses no futuro
+        
+        if requested_date < today.replace(day=1) or requested_date > max_future_date:
+            return jsonify({
+                'success': False,
+                'message': 'Mês/ano fora do intervalo permitido'
+            }), 400
+        
+        # Calcular primeiro e último dia do mês
+        first_day = datetime(year, month, 1).date()
+        if month == 12:
+            last_day = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+        else:
+            last_day = datetime(year, month + 1, 1).date() - timedelta(days=1)
+        
+        availability = {}
+        current_date = first_day
+        
+        while current_date <= last_day:
+            date_str = current_date.strftime('%Y-%m-%d')
+            # Verificar disponibilidade para cada dia
+            is_available = db.check_availability(listing_id, date_str, date_str)
+            availability[date_str] = is_available
+            current_date += timedelta(days=1)
+        
+        print(f"📅 [CALENDARIO] Disponibilidade calculada para {len(availability)} dias do mês {month}/{year}")
+        
+        return jsonify({
+            'success': True,
+            'availability': availability,
+            'listing_id': listing_id
+        })
+        
+    except Exception as e:
+        print(f"❌ [CALENDARIO] Erro ao buscar disponibilidade: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 @app.route('/api/anuncios/reservar', methods=['POST'])
@@ -2761,6 +3053,20 @@ def create_authenticated_booking():
                 'error': 'Usuário não encontrado na sessão'
             }), 400
         
+        # Verificar se o usuário não é o dono do anúncio
+        listing = db.get_public_listing_by_id(listing_id)
+        if not listing:
+            return jsonify({
+                'success': False,
+                'error': 'Anúncio não encontrado'
+            }), 404
+        
+        if listing.get('user_id') == user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Você não pode reservar seu próprio anúncio'
+            }), 400
+        
         # Criar reserva autenticada
         booking_id = db.create_authenticated_booking(
             listing_id=listing_id,
@@ -2807,6 +3113,253 @@ def api_monitor():
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         }), 500
+
+# ==================== ROTAS DE AVALIAÇÕES ====================
+
+@app.route('/avaliar-hospedagem')
+@login_required
+def avaliar_hospedagem():
+    """Página para avaliar uma hospedagem"""
+    return render_template('avaliar_hospedagem.html')
+
+@app.route('/api/reviews', methods=['POST'])
+@login_required
+def create_review():
+    """Criar uma nova avaliação para uma hospedagem"""
+    try:
+        data = request.get_json()
+        
+        # Validar dados obrigatórios
+        required_fields = ['booking_id', 'listing_id', 'cleanliness_rating', 
+                          'communication_rating', 'checkin_rating', 
+                          'accuracy_rating', 'location_rating', 'value_rating']
+        
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Campo obrigatório: {field}'}), 400
+        
+        # Verificar se o usuário pode avaliar esta reserva
+        can_review = db.can_user_review_booking(current_user.id, data['booking_id'])
+        if not can_review:
+            return jsonify({'error': 'Você não pode avaliar esta reserva'}), 403
+        
+        # Verificar se já existe uma avaliação para esta reserva
+        existing_review = db.get_booking_review(data['booking_id'])
+        if existing_review:
+            return jsonify({'error': 'Já existe uma avaliação para esta reserva'}), 409
+        
+        # Criar a avaliação com os parâmetros corretos
+        review_id = db.create_review(
+            booking_id=data['booking_id'],
+            overall_rating=data.get('overall_rating', 5),
+            cleanliness_rating=data.get('cleanliness_rating'),
+            communication_rating=data.get('communication_rating'),
+            checkin_rating=data.get('checkin_rating'),
+            accuracy_rating=data.get('accuracy_rating'),
+            location_rating=data.get('location_rating'),
+            value_rating=data.get('value_rating'),
+            review_title=data.get('review_title', ''),
+            review_comment=data.get('review_comment', ''),
+            would_recommend=data.get('would_recommend', True)
+        )
+        
+        if review_id:
+            return jsonify({
+                'message': 'Avaliação criada com sucesso',
+                'review_id': review_id
+            }), 201
+        else:
+            return jsonify({'error': 'Erro ao criar avaliação'}), 500
+            
+    except Exception as e:
+        print(f"Erro ao criar avaliação: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/api/reviews', methods=['PUT'])
+@login_required
+def update_review():
+    """Atualizar uma avaliação existente"""
+    try:
+        data = request.get_json()
+        
+        # Validar dados obrigatórios
+        if 'booking_id' not in data:
+            return jsonify({'error': 'Campo obrigatório: booking_id'}), 400
+        
+        booking_id = data['booking_id']
+        
+        # Verificar se o usuário pode editar esta avaliação
+        edit_check = db.can_user_edit_review(current_user.id, booking_id)
+        if not edit_check['can_edit']:
+            return jsonify({'error': edit_check['reason']}), 403
+        
+        # Preparar dados para atualização
+        review_data = {}
+        allowed_fields = [
+            'overall_rating', 'cleanliness_rating', 'communication_rating',
+            'checkin_rating', 'accuracy_rating', 'location_rating', 'value_rating',
+            'review_title', 'review_comment', 'would_recommend'
+        ]
+        
+        for field in allowed_fields:
+            if field in data:
+                review_data[field] = data[field]
+        
+        # Atualizar a avaliação
+        success = db.update_review(booking_id, current_user.id, **review_data)
+        
+        if success:
+            return jsonify({
+                'message': 'Avaliação atualizada com sucesso'
+            }), 200
+        else:
+            return jsonify({'error': 'Erro ao atualizar avaliação'}), 500
+            
+    except Exception as e:
+        print(f"Erro ao atualizar avaliação: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/api/reviews/listing/<int:listing_id>', methods=['GET'])
+def get_listing_reviews(listing_id):
+    """Obter todas as avaliações de uma hospedagem"""
+    try:
+        reviews = db.get_listing_reviews(listing_id)
+        rating_summary = db.get_listing_rating_summary(listing_id)
+        
+        return jsonify({
+            'reviews': reviews,
+            'rating_summary': rating_summary
+        }), 200
+        
+    except Exception as e:
+        print(f"Erro ao buscar avaliações: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/api/reviews/user', methods=['GET'])
+@login_required
+def get_user_reviews():
+    """Obter avaliações do usuário (como hóspede ou anfitrião)"""
+    try:
+        user_type = request.args.get('type', 'guest')  # 'guest' ou 'host'
+        
+        if user_type == 'guest':
+            reviews = db.get_user_reviews(current_user.id, as_guest=True)
+        elif user_type == 'host':
+            reviews = db.get_user_reviews(current_user.id, as_host=True)
+        else:
+            return jsonify({'error': 'Tipo de usuário inválido'}), 400
+        
+        return jsonify({'reviews': reviews}), 200
+        
+    except Exception as e:
+        print(f"Erro ao buscar avaliações do usuário: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/api/booking/<int:booking_id>', methods=['GET'])
+@login_required
+def get_booking_details(booking_id):
+    """Obter detalhes de uma reserva específica"""
+    try:
+        user_db_id = session.get('user_db_id')
+        if not user_db_id:
+            return jsonify({
+                'success': False,
+                'error': 'Usuário não autenticado'
+            }), 401
+        
+        # Buscar a reserva específica com dados do anúncio
+        booking_result = db.supabase.table('listing_bookings').select(
+            '*, user_listings(id, title, address, image_url, municipio_id, municipios(nome))'
+        ).eq('id', booking_id).execute()
+        
+        if not booking_result.data:
+            return jsonify({
+                'success': False,
+                'error': 'Reserva não encontrada'
+            }), 404
+        
+        booking = booking_result.data[0]
+        
+        # Verificar se o usuário tem permissão para ver esta reserva
+        # (deve ser o hóspede ou o anfitrião)
+        if (booking.get('guest_user_id') != user_db_id and 
+            booking.get('user_listings', {}).get('user_id') != user_db_id):
+            return jsonify({
+                'success': False,
+                'error': 'Você não tem permissão para ver esta reserva'
+            }), 403
+        
+        return jsonify({
+            'success': True,
+            'booking': booking
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar detalhes da reserva: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/reviews/booking/<int:booking_id>', methods=['GET'])
+@login_required
+def get_booking_review(booking_id):
+    """Obter avaliação de uma reserva específica"""
+    try:
+        review = db.get_booking_review(booking_id)
+        
+        if review:
+            return jsonify({'review': review}), 200
+        else:
+            return jsonify({'review': None}), 200
+        
+    except Exception as e:
+        print(f"Erro ao buscar avaliação da reserva: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/api/reviews/can-review/<int:booking_id>', methods=['GET'])
+@login_required
+def can_review_booking(booking_id):
+    """Verificar se o usuário pode avaliar uma reserva"""
+    try:
+        can_review = db.can_user_review_booking(current_user.id, booking_id)
+        
+        return jsonify({'can_review': can_review}), 200
+        
+    except Exception as e:
+        print(f"Erro ao verificar permissão de avaliação: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/api/reviews/can-edit/<int:booking_id>', methods=['GET'])
+@login_required
+def can_edit_review(booking_id):
+    """Verificar se o usuário pode editar uma avaliação"""
+    try:
+        edit_check = db.can_user_edit_review(current_user.id, booking_id)
+        
+        # Se pode editar, incluir os dados da avaliação existente
+        if edit_check.get('can_edit'):
+            existing_review = db.get_booking_review(booking_id)
+            if existing_review:
+                edit_check['review'] = {
+                    'overall_rating': existing_review.get('overall_rating'),
+                    'cleanliness_rating': existing_review.get('cleanliness_rating'),
+                    'communication_rating': existing_review.get('communication_rating'),
+                    'checkin_rating': existing_review.get('checkin_rating'),
+                    'accuracy_rating': existing_review.get('accuracy_rating'),
+                    'location_rating': existing_review.get('location_rating'),
+                    'value_rating': existing_review.get('value_rating'),
+                    'title': existing_review.get('review_title'),
+                    'comment': existing_review.get('review_comment'),
+                    'would_recommend': existing_review.get('would_recommend', False),
+                    'is_public': existing_review.get('is_public', False)
+                }
+        
+        return jsonify(edit_check), 200
+        
+    except Exception as e:
+        print(f"Erro ao verificar permissão de edição: {e}")
+        return jsonify({'can_edit': False, 'reason': 'Erro interno do servidor'}), 500
 
 
 if __name__ == '__main__':

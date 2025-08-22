@@ -3362,6 +3362,123 @@ def can_edit_review(booking_id):
         return jsonify({'can_edit': False, 'reason': 'Erro interno do servidor'}), 500
 
 
+# ===== ROTAS DE API PARA SISTEMA DE PREÇO DINÂMICO =====
+
+@app.route('/api/dynamic-pricing/apply', methods=['POST'])
+@login_required
+def apply_dynamic_pricing():
+    """Aplicar preço dinâmico a um anúncio"""
+    try:
+        from dynamic_pricing_system import DynamicPricingSystem
+        
+        data = request.get_json()
+        listing_id = data.get('listing_id')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if not all([listing_id, start_date, end_date]):
+            return jsonify({'error': 'listing_id, start_date e end_date são obrigatórios'}), 400
+        
+        # Verificar se o anúncio pertence ao usuário
+        listing = db.get_listing_by_id(listing_id)
+        if not listing or listing.get('user_id') != current_user.id:
+            return jsonify({'error': 'Anúncio não encontrado ou sem permissão'}), 404
+        
+        # Aplicar preço dinâmico
+        pricing_system = DynamicPricingSystem()
+        result = pricing_system.apply_dynamic_pricing_to_listing(
+            listing_id, start_date, end_date
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Preço dinâmico aplicado com sucesso',
+            'result': result
+        }), 200
+        
+    except Exception as e:
+        print(f"Erro ao aplicar preço dinâmico: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/api/dynamic-pricing/history/<int:listing_id>', methods=['GET'])
+@login_required
+def get_dynamic_pricing_history(listing_id):
+    """Obter histórico de preços dinâmicos de um anúncio"""
+    try:
+        # Verificar se o anúncio pertence ao usuário
+        listing = db.get_listing_by_id(listing_id)
+        if not listing or listing.get('user_id') != current_user.id:
+            return jsonify({'error': 'Anúncio não encontrado ou sem permissão'}), 404
+        
+        # Obter histórico
+        history = db.get_dynamic_pricing_history(listing_id)
+        
+        return jsonify({
+            'success': True,
+            'history': history
+        }), 200
+        
+    except Exception as e:
+        print(f"Erro ao obter histórico de preços: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/api/dynamic-pricing/demand/<int:municipio_id>', methods=['GET'])
+@login_required
+def get_regional_demand(municipio_id):
+    """Obter dados de demanda regional"""
+    try:
+        from dynamic_pricing_system import DynamicPricingSystem
+        
+        pricing_system = DynamicPricingSystem()
+        demand_data = pricing_system.get_regional_demand_data(municipio_id)
+        
+        return jsonify({
+            'success': True,
+            'demand_data': demand_data
+        }), 200
+        
+    except Exception as e:
+        print(f"Erro ao obter dados de demanda: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/api/dynamic-pricing/calculate', methods=['POST'])
+@login_required
+def calculate_dynamic_price():
+    """Calcular preço dinâmico para uma data específica"""
+    try:
+        from dynamic_pricing_system import DynamicPricingSystem
+        
+        data = request.get_json()
+        listing_id = data.get('listing_id')
+        date = data.get('date')
+        
+        if not all([listing_id, date]):
+            return jsonify({'error': 'listing_id e date são obrigatórios'}), 400
+        
+        # Verificar se o anúncio pertence ao usuário
+        listing = db.get_listing_by_id(listing_id)
+        if not listing or listing.get('user_id') != current_user.id:
+            return jsonify({'error': 'Anúncio não encontrado ou sem permissão'}), 404
+        
+        # Calcular preço dinâmico
+        pricing_system = DynamicPricingSystem()
+        price_data = pricing_system.calculate_dynamic_price(listing_id, date)
+        
+        return jsonify({
+            'success': True,
+            'price_data': price_data
+        }), 200
+        
+    except Exception as e:
+        print(f"Erro ao calcular preço dinâmico: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+@app.route('/dynamic-pricing')
+@login_required
+def dynamic_pricing_page():
+    """Página de gerenciamento de preços dinâmicos"""
+    return render_template('dynamic_pricing.html')
+
 if __name__ == '__main__':
     print("🌐 Iniciando aplicação web...")
     print("📊 Acesse: http://localhost:5000")

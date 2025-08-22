@@ -1639,6 +1639,28 @@ class HostLinkDatabase:
                 print(f"❌ Erro na conexão com Supabase: {e2}")
                 return False
 
+    def get_dynamic_pricing_history(self, listing_id: int, limit: int = 50) -> List[Dict]:
+        """Obter histórico de preços dinâmicos de um anúncio"""
+        try:
+            result = self.supabase.table('dynamic_pricing_history').select(
+                '*'
+            ).eq('listing_id', listing_id).order('created_at', desc=True).limit(limit).execute()
+            return result.data
+        except Exception as e:
+            print(f"❌ Erro ao obter histórico de preços: {e}")
+            return []
+
+    def get_regional_demand_summary(self, municipio_id: int) -> List[Dict]:
+        """Obter resumo da demanda regional"""
+        try:
+            result = self.supabase.table('regional_demand').select(
+                '*, municipios(nome)'
+            ).eq('municipio_id', municipio_id).order('period_start', desc=True).limit(10).execute()
+            return result.data
+        except Exception as e:
+            print(f"❌ Erro ao obter resumo de demanda: {e}")
+            return []
+
     def create_review(self, booking_id: int, overall_rating: int, 
                      cleanliness_rating: int = None, communication_rating: int = None,
                      checkin_rating: int = None, accuracy_rating: int = None,

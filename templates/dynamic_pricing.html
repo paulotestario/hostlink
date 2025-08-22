@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}Preços Dinâmicos - HostLink{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2><i class="fas fa-chart-line"></i> Sistema de Preços Dinâmicos</h2>
+            <p class="text-muted">Gerencie preços baseados na demanda regional</p>
+        </div>
+    </div>
+    
+    <!-- Formulário de Aplicação -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-magic"></i> Aplicar Preços Dinâmicos</h5>
+                </div>
+                <div class="card-body">
+                    <form id="dynamic-pricing-form">
+                        <div class="mb-3">
+                            <label for="listing-select" class="form-label">Anúncio</label>
+                            <select class="form-select" id="listing-select" required>
+                                <option value="">Selecione um anúncio...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="start-date" class="form-label">Data Início</label>
+                                    <input type="date" class="form-control" id="start-date" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="end-date" class="form-label">Data Fim</label>
+                                    <input type="date" class="form-control" id="end-date" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-calculator"></i> Aplicar Preços Dinâmicos
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Visualização de Resultados -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar"></i> Análise de Demanda</h5>
+                </div>
+                <div class="card-body">
+                    <div id="demand-analysis">
+                        <p class="text-muted">Selecione um anúncio e período para ver a análise</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Histórico de Preços -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-history"></i> Histórico de Preços Dinâmicos</h5>
+                </div>
+                <div class="card-body">
+                    <div id="pricing-history">
+                        <p class="text-muted">Nenhum histórico disponível</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Carregar anúncios do usuário
+    loadUserListings();
+    
+    // Event listener para o formulário
+    document.getElementById('dynamic-pricing-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        applyDynamicPricing();
+    });
+    
+    // Event listener para mudança de anúncio
+    document.getElementById('listing-select').addEventListener('change', function() {
+        const listingId = this.value;
+        if (listingId) {
+            loadPricingHistory(listingId);
+        }
+    });
+});
+
+function loadUserListings() {
+    fetch('/api/user_listings')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('listing-select');
+                select.innerHTML = '<option value="">Selecione um anúncio...</option>';
+                
+                data.listings.forEach(listing => {
+                    const option = document.createElement('option');
+                    option.value = listing.id;
+                    option.textContent = `${listing.title} - R$ ${listing.price_per_night}/noite`;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar anúncios:', error);
+        });
+}
+
+function applyDynamicPricing() {
+    const listingId = document.getElementById('listing-select').value;
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    
+    if (!listingId || !startDate || !endDate) {
+        alert('Por favor, preencha todos os campos');
+        return;
+    }
+    
+    // Mostrar loading
+    const demandDiv = document.getElementById('demand-analysis');
+    demandDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Calculando preços dinâmicos...</div>';
+    
+    fetch(`/api/dynamic-pricing/${listingId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            start_date: startDate,
+            end_date: endDate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            demandDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> ${data.message}
+                </div>
+            `;
+            
+            // Recarregar histórico
+            loadPricingHistory(listingId);
+        } else {
+            demandDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> ${data.message}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        demandDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i> Erro ao aplicar preços dinâmicos
+            </div>
+        `;
+    });
+}
+
+function loadPricingHistory(listingId) {
+    fetch(`/api/pricing-history/${listingId}`)
+        .then(response => response.json())
+        .then(data => {
+            const historyDiv = document.getElementById('pricing-history');
+            
+            if (data.success && data.data.length > 0) {
+                let html = `
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Preço Original</th>
+                                    <th>Preço Dinâmico</th>
+                                    <th>Multiplicador</th>
+                                    <th>Score Demanda</th>
+                                    <th>Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                data.data.forEach(record => {
+                    const multiplierClass = record.price_multiplier > 1 ? 'text-success' : 
+                                          record.price_multiplier < 1 ? 'text-danger' : 'text-muted';
+                    
+                    html += `
+                        <tr>
+                            <td>${new Date(record.date).toLocaleDateString('pt-BR')}</td>
+                            <td>R$ ${record.original_price.toFixed(2)}</td>
+                            <td><strong>R$ ${record.dynamic_price.toFixed(2)}</strong></td>
+                            <td class="${multiplierClass}">${record.price_multiplier.toFixed(2)}x</td>
+                            <td>${record.demand_score ? record.demand_score.toFixed(1) : 'N/A'}</td>
+                            <td><small>${record.reason}</small></td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                historyDiv.innerHTML = html;
+            } else {
+                historyDiv.innerHTML = '<p class="text-muted">Nenhum histórico de preços encontrado</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar histórico:', error);
+        });
+}
+</script>
+{% endblock %}
